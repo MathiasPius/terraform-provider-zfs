@@ -41,10 +41,6 @@ func dataSourceDataset() *schema.Resource {
 							Type: schema.TypeString,
 							Computed: true,
 						},
-						"make_path": {
-							Type: schema.TypeBool,
-							Computed: true,
-						},
 						"uid": {
 							Type: schema.TypeString,
 							Computed: true,
@@ -58,13 +54,6 @@ func dataSourceDataset() *schema.Resource {
 			},
 		},
 	}
-}
-
-type MountPoint struct {
-	path string
-	make_path bool
-	uid	string
-	gid string
 }
 
 func dataSourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
@@ -95,8 +84,7 @@ func dataSourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta int
 	reader := csv.NewReader(strings.NewReader(stdout))
 	reader.Comma = '\t'
 
-	mountpoint := make([]map[string]interface {}, 1)
-	mountpoint[0] = make(map[string]interface{})
+	mountpoint := []map[string]interface {}{make(map[string]interface{})}
 
 	for {
 		line, err := reader.Read()
