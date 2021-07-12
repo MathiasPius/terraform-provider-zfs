@@ -1,3 +1,3 @@
-provider "scaffolding" {
+provider "zfs" {
   # example configuration here
 }
