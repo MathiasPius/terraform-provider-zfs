@@ -34,6 +34,7 @@ func dataSourceDataset() *schema.Resource {
 				// This description is used by the documentation generator and the language server.
 				Description: "Mountpoint of the dataset.",
 				Type:        schema.TypeSet,
+				MaxItems: 	 1,
 				Computed:    true,
 				Elem: &schema.Resource {
 					Schema: map[string]*schema.Schema {
@@ -57,8 +58,6 @@ func dataSourceDataset() *schema.Resource {
 }
 
 func dataSourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
-	// use the meta value to retrieve your client from the provider configure method
-	// client := meta.(*apiClient)
 	var diags diag.Diagnostics
 
 	ssh := meta.(*easyssh.MakeConfig)
