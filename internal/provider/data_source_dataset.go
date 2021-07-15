@@ -1,14 +1,14 @@
 package provider
 
 import (
-	"io"
-	"fmt"
-	"log"
-	"time"
-	"errors"
 	"context"
-	"strings"
 	"encoding/csv"
+	"errors"
+	"fmt"
+	"io"
+	"log"
+	"strings"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -34,20 +34,19 @@ func dataSourceDataset() *schema.Resource {
 				// This description is used by the documentation generator and the language server.
 				Description: "Mountpoint of the dataset.",
 				Type:        schema.TypeSet,
-				MaxItems: 	 1,
 				Computed:    true,
-				Elem: &schema.Resource {
-					Schema: map[string]*schema.Schema {
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
 						"path": {
-							Type: schema.TypeString,
+							Type:     schema.TypeString,
 							Computed: true,
 						},
 						"uid": {
-							Type: schema.TypeString,
+							Type:     schema.TypeString,
 							Computed: true,
 						},
 						"gid": {
-							Type: schema.TypeString,
+							Type:     schema.TypeString,
 							Computed: true,
 						},
 					},
@@ -65,36 +64,28 @@ func dataSourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta int
 	dataset_name := d.Get("id").(string)
 
 	cmd := fmt.Sprintf("sudo zfs get -H mountpoint %s", dataset_name)
-	log.Printf("[DEBUG] zfs command: %s", cmd)
-	stdout, stderr, done, err := ssh.Run(cmd, 60*time.Second)
+
+	stdout, err := callSshCommand(ssh, cmd)
 
 	if err != nil {
 		return diag.FromErr(err)
 	}
 
-	if stderr != "" {
-		return diag.FromErr(errors.New(fmt.Sprintf("stdout error: %s", stderr)))
-	}
-
-	if !done {
-		return diag.Errorf("command timed out")
-	}
-
 	reader := csv.NewReader(strings.NewReader(stdout))
 	reader.Comma = '\t'
 
-	mountpoint := []map[string]interface {}{make(map[string]interface{})}
+	mountpoint := []map[string]interface{}{make(map[string]interface{})}
 
 	for {
 		line, err := reader.Read()
 		if err == io.EOF {
-				break
+			break
 		} else if err != nil {
-				diag.FromErr(err)
+			diag.FromErr(err)
 		}
 
 		log.Printf("[DEBUG] CSV line: %s", line)
-		
+
 		if line[1] == "mountpoint" {
 			mountpoint[0]["path"] = line[2]
 		}
@@ -109,11 +100,11 @@ func dataSourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta int
 		if err != nil {
 			return diag.FromErr(err)
 		}
-	
+
 		if stderr != "" {
 			return diag.FromErr(errors.New(fmt.Sprintf("stdout error: %s", stderr)))
 		}
-	
+
 		if !done {
 			return diag.Errorf("command timed out")
 		}

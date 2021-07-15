@@ -1,14 +1,14 @@
 package provider
 
 import (
-	"io"
-	"fmt"
-	"log"
-	"time"
-	"errors"
 	"context"
-	"strings"
 	"encoding/csv"
+	"errors"
+	"fmt"
+	"io"
+	"log"
+	"strings"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -32,13 +32,13 @@ func dataSourcePool() *schema.Resource {
 			},
 			"size": {
 				Description: "Size of the pool.",
-				Type:			   schema.TypeString,
-				Computed: 	 true,
+				Type:        schema.TypeString,
+				Computed:    true,
 			},
 			"capacity": {
 				Description: "Capacity of the pool.",
-				Type:			   schema.TypeString,
-				Computed: 	 true,
+				Type:        schema.TypeString,
+				Computed:    true,
 			},
 		},
 	}
@@ -73,13 +73,13 @@ func dataSourcePoolRead(ctx context.Context, d *schema.ResourceData, meta interf
 	for {
 		line, err := reader.Read()
 		if err == io.EOF {
-				break
+			break
 		} else if err != nil {
-				diag.FromErr(err)
+			diag.FromErr(err)
 		}
 
 		log.Printf("[DEBUG] CSV line: %s", line)
-		
+
 		if err := d.Set(line[1], line[2]); err != nil {
 			return diag.FromErr(err)
 		}

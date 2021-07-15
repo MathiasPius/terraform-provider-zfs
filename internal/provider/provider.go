@@ -1,8 +1,8 @@
 package provider
 
 import (
-	"time"
 	"context"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -29,45 +29,45 @@ func init() {
 func New(version string) func() *schema.Provider {
 	return func() *schema.Provider {
 		p := &schema.Provider{
-			Schema: map[string]*schema.Schema {
-				"user": &schema.Schema {
-					Type: schema.TypeString,
-					Required: true,
+			Schema: map[string]*schema.Schema{
+				"user": &schema.Schema{
+					Type:        schema.TypeString,
+					Required:    true,
 					DefaultFunc: schema.EnvDefaultFunc("ZFS_PROVIDER_USERNAME", nil),
 				},
 				"host": &schema.Schema{
-					Type: schema.TypeString,
-					Required: true,
+					Type:        schema.TypeString,
+					Required:    true,
 					DefaultFunc: schema.EnvDefaultFunc("ZFS_PROVIDER_HOSTNAME", nil),
 				},
-				"port": &schema.Schema {
-					Type: schema.TypeString,
-					Required: true,
+				"port": &schema.Schema{
+					Type:        schema.TypeString,
+					Required:    true,
 					DefaultFunc: schema.EnvDefaultFunc("ZFS_PROVIDER_PORT", "22"),
 				},
-				"key": &schema.Schema {
-					Type: schema.TypeString,
-					Optional: true,
+				"key": &schema.Schema{
+					Type:        schema.TypeString,
+					Optional:    true,
 					DefaultFunc: schema.EnvDefaultFunc("ZFS_PROVIDER_KEY", nil),
 				},
-				"key_path": &schema.Schema {
-					Type: schema.TypeString,
-					Optional: true,
+				"key_path": &schema.Schema{
+					Type:        schema.TypeString,
+					Optional:    true,
 					DefaultFunc: schema.EnvDefaultFunc("ZFS_PROVIDER_KEY_PATH", nil),
 				},
-				"key_passphrase": &schema.Schema {
-					Type: schema.TypeString,
-					Optional: true,
+				"key_passphrase": &schema.Schema{
+					Type:        schema.TypeString,
+					Optional:    true,
 					DefaultFunc: schema.EnvDefaultFunc("ZFS_PROVIDER_KEY_PASSPHRASE", nil),
 				},
-				"password": &schema.Schema {
-					Type: schema.TypeString,
-					Optional: true,
+				"password": &schema.Schema{
+					Type:        schema.TypeString,
+					Optional:    true,
 					DefaultFunc: schema.EnvDefaultFunc("ZFS_PROVIDER_PASSWORD", nil),
 				},
 			},
 			DataSourcesMap: map[string]*schema.Resource{
-				"zfs_pool": dataSourcePool(),
+				"zfs_pool":    dataSourcePool(),
 				"zfs_dataset": dataSourceDataset(),
 			},
 			ResourcesMap: map[string]*schema.Resource{
@@ -84,14 +84,14 @@ func New(version string) func() *schema.Provider {
 func configure(version string, p *schema.Provider) func(context.Context, *schema.ResourceData) (interface{}, diag.Diagnostics) {
 	return func(ctx context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
 		return &easyssh.MakeConfig{
-			Server:  		d.Get("host").(string),
-			Port:    		d.Get("port").(string),
-			User:    		d.Get("user").(string),
-			Key:		 		d.Get("key").(string),
-			KeyPath: 		d.Get("key_path").(string),
-			Password: 	d.Get("password").(string),
+			Server:     d.Get("host").(string),
+			Port:       d.Get("port").(string),
+			User:       d.Get("user").(string),
+			Key:        d.Get("key").(string),
+			KeyPath:    d.Get("key_path").(string),
+			Password:   d.Get("password").(string),
 			Passphrase: d.Get("key_passphrase").(string),
-			Timeout: 60 * time.Second,
+			Timeout:    60 * time.Second,
 		}, nil
 	}
 }
