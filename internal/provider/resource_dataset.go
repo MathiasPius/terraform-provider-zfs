@@ -114,33 +114,39 @@ func resourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta inter
 	datasetName := d.Get("name").(string)
 
 	ssh := meta.(*easyssh.MakeConfig)
-	_, err := describeDataset(ssh, datasetName)
+	dataset, err := describeDataset(ssh, datasetName)
 	if err != nil {
 		return diag.FromErr(err)
 	}
 
+	mountpoint := make([]map[string]string, 1)
+	mountpoint[0] = map[string]string{
+		"path": dataset.mountpoint,
+	}
+
+	d.Set("mountpoint", mountpoint)
 	d.SetId(datasetName)
 
 	return diags
 }
 
 func resourceDatasetUpdate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
-	var diags diag.Diagnostics
-
 	ssh := meta.(*easyssh.MakeConfig)
 	datasetName := d.Get("name").(string)
 
 	d.Partial(true)
 
 	// Change mountpoint
-	if d.HasChange("mountpoint.0.path") {
-		if _, err := updateOption(ssh, datasetName, "mountpoint", d.Get("mountpoint.0.path").(string)); err != nil {
+	if d.HasChange("mountpoint") {
+		log.Println("[DEBUG] updating path!")
+		new_mountpoint := d.Get("mountpoint").(*schema.Set).List()[0].(map[string]interface{})["path"].(string)
+		if _, err := updateOption(ssh, datasetName, "mountpoint", new_mountpoint); err != nil {
 			return diag.FromErr(err)
 		}
 	}
 
 	d.Partial(false)
-	return diags
+	return resourceDatasetRead(ctx, d, meta)
 }
 
 func resourceDatasetDelete(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
