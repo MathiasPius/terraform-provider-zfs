@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"encoding/csv"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -102,7 +101,7 @@ func dataSourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta int
 		}
 
 		if stderr != "" {
-			return diag.FromErr(errors.New(fmt.Sprintf("stdout error: %s", stderr)))
+			return diag.FromErr(fmt.Errorf("stdout error: %s", stderr))
 		}
 
 		if !done {

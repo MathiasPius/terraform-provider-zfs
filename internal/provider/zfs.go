@@ -75,7 +75,7 @@ type CreateDataset struct {
 
 func createDataset(ssh *easyssh.MakeConfig, dataset *CreateDataset) (*Dataset, error) {
 
-	options := make(map[string]string, 0)
+	options := make(map[string]string)
 	if dataset.mountpoint != "" {
 		options["mountpoint"] = dataset.mountpoint
 	}

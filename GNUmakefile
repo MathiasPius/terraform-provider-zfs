@@ -1,6 +1,6 @@
 default: testacc
 version = 0.1.1
-local_path = ~/.terraform.d/plugins/local/MathiasPius/zfs/terraform-provider-zfs/$(version)
+local_path = ~/.terraform.d/plugins/local/MathiasPius/zfs/$(version)/linux_amd64/
 
 # Run acceptance tests
 .PHONY: testacc
@@ -19,4 +19,4 @@ docker-build:
 
 .PHONY: lint
 lint:
-	docker run --rm -v $(pwd):/data docker.io/cytopia/golint .
+	docker run -it --rm -v $(pwd):/data docker.io/cytopia/golint .

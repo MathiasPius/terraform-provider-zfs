@@ -78,10 +78,10 @@ func resourceDatasetCreate(ctx context.Context, d *schema.ResourceData, meta int
 	}
 
 	if err != nil {
-		switch err.(type) {
+		switch err := err.(type) {
 		case *DatasetError:
 			{
-				if err.(*DatasetError).errmsg != "dataset does not exist" {
+				if err.errmsg != "dataset does not exist" {
 					log.Printf("[DEBUG] zfs err: %s", err.Error())
 					return diag.FromErr(err)
 				}
