@@ -2,6 +2,7 @@ package provider
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -9,7 +10,8 @@ import (
 	"github.com/appleboy/easyssh-proxy"
 )
 
-func callSshCommand(ssh *easyssh.MakeConfig, cmd string) (string, error) {
+func callSshCommand(ssh *easyssh.MakeConfig, cmd string, args ...interface{}) (string, error) {
+	cmd = fmt.Sprintf(cmd, args...)
 	log.Printf("[DEBUG] ssh command: %s", cmd)
 	stdout, stderr, done, err := ssh.Run(cmd, 60*time.Second)
 
