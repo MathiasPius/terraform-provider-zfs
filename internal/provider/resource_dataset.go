@@ -20,6 +20,10 @@ func resourceDataset() *schema.Resource {
 		UpdateContext: resourceDatasetUpdate,
 		DeleteContext: resourceDatasetDelete,
 
+		Importer: &schema.ResourceImporter{
+			StateContext: schema.ImportStatePassthroughContext,
+		},
+
 		Schema: map[string]*schema.Schema{
 			"name": {
 				// This description is used by the documentation generator and the language server.
@@ -128,6 +132,7 @@ func resourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta inter
 		// is accurate, and use that.
 		datasetName = d.Get("name").(string)
 	}
+	d.Set("name", datasetName)
 
 	dataset, err := describeDataset(ssh, datasetName)
 	if err != nil {
