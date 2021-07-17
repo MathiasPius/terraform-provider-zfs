@@ -94,16 +94,17 @@ func resourceDatasetCreate(ctx context.Context, d *schema.ResourceData, meta int
 		}
 	}
 
-	_, err = createDataset(ssh, &CreateDataset{
+	dataset, err = createDataset(ssh, &CreateDataset{
 		name:       datasetName,
-		mountpoint: d.Get("mountpoint.0.path").(string),
+		mountpoint: d.Get("mountpoint").(*schema.Set).List()[0].(map[string]interface{})["path"].(string),
 	})
 
 	if err != nil {
 		diag.FromErr(err)
 	}
 
-	d.SetId(datasetName)
+	log.Printf("[DEBUG] committing guid: %s", dataset.guid)
+	d.SetId(dataset.guid)
 
 	return diags
 }
@@ -111,9 +112,23 @@ func resourceDatasetCreate(ctx context.Context, d *schema.ResourceData, meta int
 func resourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	var diags diag.Diagnostics
 
-	datasetName := d.Get("name").(string)
-
 	ssh := meta.(*easyssh.MakeConfig)
+
+	datasetName := ""
+	if id := d.Id(); id != "" {
+		// If we have a Resource ID, then use that to lookup the real name
+		// of the zfs resource, in case the name has changed.
+		real_name, err := getDatasetNameByGuid(ssh, id)
+		if err != nil {
+			return diag.FromErr(err)
+		}
+		datasetName = *real_name
+	} else {
+		// If there's no Resource ID, then we can just assume the name
+		// is accurate, and use that.
+		datasetName = d.Get("name").(string)
+	}
+
 	dataset, err := describeDataset(ssh, datasetName)
 	if err != nil {
 		return diag.FromErr(err)
@@ -125,16 +140,27 @@ func resourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta inter
 	}
 
 	d.Set("mountpoint", mountpoint)
-	d.SetId(datasetName)
+	d.SetId(dataset.guid)
 
 	return diags
 }
 
 func resourceDatasetUpdate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	ssh := meta.(*easyssh.MakeConfig)
-	datasetName := d.Get("name").(string)
+	datasetId := d.Id()
+	old_name, err := getDatasetNameByGuid(ssh, datasetId)
+	if err != nil {
+		return diag.FromErr(err)
+	}
 
+	datasetName := d.Get("name").(string)
 	d.Partial(true)
+
+	if datasetName != *old_name {
+		if err := renameDataset(ssh, *old_name, datasetName); err != nil {
+			return diag.FromErr(err)
+		}
+	}
 
 	// Change mountpoint
 	if d.HasChange("mountpoint") {
@@ -150,8 +176,15 @@ func resourceDatasetUpdate(ctx context.Context, d *schema.ResourceData, meta int
 }
 
 func resourceDatasetDelete(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
-	// use the meta value to retrieve your client from the provider configure method
-	// client := meta.(*apiClient)
+	var diags diag.Diagnostics
+	ssh := meta.(*easyssh.MakeConfig)
+	datasetName := d.Get("name").(string)
 
-	return diag.Errorf("not implemented")
+	if err := destroyDataset(ssh, datasetName); err != nil {
+		return diag.FromErr(err)
+	}
+
+	d.SetId("")
+
+	return diags
 }

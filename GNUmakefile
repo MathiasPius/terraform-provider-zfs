@@ -13,7 +13,7 @@ build-local:
 	go fmt ./... && go build -o $(local_path)/terraform-provider-zfs
 
 .PHONY: docker-build
-docker-build:
+docker-build: lint
 	mkdir -p $(local_path)
 	DOCKER_BUILDKIT=1 docker build --output $(local_path)/ .
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
-	"io"
 	"log"
 	"strings"
 	"time"
@@ -23,7 +22,7 @@ func dataSourceDataset() *schema.Resource {
 		ReadContext: dataSourceDatasetRead,
 
 		Schema: map[string]*schema.Schema{
-			"id": {
+			"name": {
 				// This description is used by the documentation generator and the language server.
 				Description: "Name of the zfs dataset.",
 				Type:        schema.TypeString,
@@ -60,39 +59,35 @@ func dataSourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta int
 
 	ssh := meta.(*easyssh.MakeConfig)
 
-	dataset_name := d.Get("id").(string)
+	datasetName := d.Get("name").(string)
+	dataset, err := describeDataset(ssh, datasetName)
 
-	cmd := fmt.Sprintf("sudo zfs get -H mountpoint %s", dataset_name)
-
-	stdout, err := callSshCommand(ssh, cmd)
+	if dataset == nil {
+		log.Println("[DEBUG] zfs dataset does not exist!")
+	}
 
 	if err != nil {
-		return diag.FromErr(err)
+		switch err := err.(type) {
+		case *DatasetError:
+			{
+				if err.errmsg != "dataset does not exist" {
+					log.Printf("[DEBUG] zfs err: %s", err.Error())
+					return diag.FromErr(err)
+				}
+			}
+		default:
+			{
+				log.Printf("[DEBUG] zfs err: %s", err.Error())
+				return diag.FromErr(err)
+			}
+		}
 	}
-
-	reader := csv.NewReader(strings.NewReader(stdout))
-	reader.Comma = '\t'
 
 	mountpoint := []map[string]interface{}{make(map[string]interface{})}
-
-	for {
-		line, err := reader.Read()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			diag.FromErr(err)
-		}
-
-		log.Printf("[DEBUG] CSV line: %s", line)
-
-		if line[1] == "mountpoint" {
-			mountpoint[0]["path"] = line[2]
-		}
-	}
-
-	if path, ok := mountpoint[0]["path"]; ok && path != "legacy" {
+	mountpoint[0]["path"] = dataset.mountpoint
+	if dataset.mountpoint != "" && dataset.mountpoint != "legacy" && dataset.mountpoint != "none" {
 		// If mountpoint is specified, check the owner of the path
-		cmd := fmt.Sprintf("sudo stat -c '%%U,%%G' '%s'", path)
+		cmd := fmt.Sprintf("sudo stat -c '%%U,%%G' '%s'", dataset.mountpoint)
 		log.Printf("[DEBUG] stat command: %s", cmd)
 		stdout, stderr, done, err := ssh.Run(cmd, 60*time.Second)
 
@@ -119,7 +114,7 @@ func dataSourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta int
 	}
 
 	d.Set("mountpoint", mountpoint)
-	d.SetId(dataset_name)
+	d.SetId(dataset.guid)
 
 	return diags
 }

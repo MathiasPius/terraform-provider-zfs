@@ -11,6 +11,7 @@ import (
 )
 
 type Dataset struct {
+	guid       string
 	creation   string
 	used       string
 	available  string
@@ -23,6 +24,33 @@ func updateOption(ssh *easyssh.MakeConfig, datasetName string, option string, va
 	log.Printf("[DEBUG] changing zfs option %s for %s to %s", option, datasetName, value)
 	cmd := fmt.Sprintf("sudo zfs set %s=%s %s", option, value, datasetName)
 	return callSshCommand(ssh, cmd)
+}
+
+func getDatasetNameByGuid(ssh *easyssh.MakeConfig, guid string) (*string, error) {
+	cmd := fmt.Sprintf("sudo zfs list -H -o name,guid")
+	stdout, err := callSshCommand(ssh, cmd)
+
+	if err != nil {
+		return nil, err
+	}
+
+	reader := csv.NewReader(strings.NewReader(stdout))
+	reader.Comma = '\t'
+
+	for {
+		line, err := reader.Read()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return nil, err
+		}
+		if line[1] == guid {
+			log.Printf("[DEBUG] found dataset by guid: %s", line[0])
+			return &line[0], nil
+		}
+	}
+
+	return nil, fmt.Errorf("no dataset found with guid %s", guid)
 }
 
 func describeDataset(ssh *easyssh.MakeConfig, datasetName string) (*Dataset, error) {
@@ -45,8 +73,6 @@ func describeDataset(ssh *easyssh.MakeConfig, datasetName string) (*Dataset, err
 			return nil, err
 		}
 
-		log.Printf("[DEBUG] CSV line: %s", line)
-
 		switch line[1] {
 		case "creation":
 			dataset.creation = line[2]
@@ -60,8 +86,10 @@ func describeDataset(ssh *easyssh.MakeConfig, datasetName string) (*Dataset, err
 			dataset.mounted = line[2]
 		case "mountpoint":
 			dataset.mountpoint = line[2]
+		case "guid":
+			dataset.guid = line[2]
 		default:
-			log.Printf("[DEBUG] ignoring attribute: %s (%s)", line[1], line[2])
+			// do nothing
 		}
 	}
 
@@ -102,4 +130,26 @@ func createDataset(ssh *easyssh.MakeConfig, dataset *CreateDataset) (*Dataset, e
 
 	fetch_dataset, fetcherr := describeDataset(ssh, dataset.name)
 	return fetch_dataset, fetcherr
+}
+
+func destroyDataset(ssh *easyssh.MakeConfig, datasetName string) error {
+	cmd := fmt.Sprintf("sudo zfs destroy -r %s", datasetName)
+	_, err := callSshCommand(ssh, cmd)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func renameDataset(ssh *easyssh.MakeConfig, oldName string, newName string) error {
+	cmd := fmt.Sprintf("sudo zfs rename %s %s", oldName, newName)
+	_, err := callSshCommand(ssh, cmd)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
