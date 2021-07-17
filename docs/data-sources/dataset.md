@@ -17,7 +17,11 @@ Data about a specific dataset.
 
 ### Required
 
-- **id** (String) Name of the zfs dataset.
+- **name** (String) Name of the zfs dataset.
+
+### Optional
+
+- **id** (String) The ID of this resource.
 
 ### Read-Only
 
