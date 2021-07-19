@@ -2,11 +2,7 @@ package provider
 
 import (
 	"context"
-	"encoding/csv"
-	"fmt"
 	"log"
-	"strings"
-	"time"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -31,7 +27,7 @@ func dataSourceDataset() *schema.Resource {
 			"mountpoint": {
 				// This description is used by the documentation generator and the language server.
 				Description: "Mountpoint of the dataset.",
-				Type:        schema.TypeSet,
+				Type:        schema.TypeList,
 				Computed:    true,
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
@@ -39,13 +35,25 @@ func dataSourceDataset() *schema.Resource {
 							Type:     schema.TypeString,
 							Computed: true,
 						},
+						"owner": {
+							Description: "Set owner of the mountpoint. Must be a valid username",
+							Type:        schema.TypeString,
+							Computed:    true,
+						},
 						"uid": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Description: "Set owner of the mountpoint. Must be a valid uid",
+							Type:        schema.TypeString,
+							Computed:    true,
+						},
+						"group": {
+							Description: "Set group of the mountpoint. Must be a valid group name",
+							Type:        schema.TypeString,
+							Computed:    true,
 						},
 						"gid": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Description: "Set group of the mountpoint. Must be a valid gid",
+							Type:        schema.TypeString,
+							Computed:    true,
 						},
 					},
 				},
@@ -83,34 +91,18 @@ func dataSourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta int
 		}
 	}
 
-	mountpoint := []map[string]interface{}{make(map[string]interface{})}
-	mountpoint[0]["path"] = dataset.mountpoint
-	if dataset.mountpoint != "" && dataset.mountpoint != "legacy" && dataset.mountpoint != "none" {
-		// If mountpoint is specified, check the owner of the path
-		cmd := fmt.Sprintf("sudo stat -c '%%U,%%G' '%s'", dataset.mountpoint)
-		log.Printf("[DEBUG] stat command: %s", cmd)
-		stdout, stderr, done, err := ssh.Run(cmd, 60*time.Second)
+	owner, err := getFileOwnership(ssh, dataset.mountpoint)
+	if err != nil {
+		return diag.FromErr(err)
+	}
 
-		if err != nil {
-			return diag.FromErr(err)
-		}
-
-		if stderr != "" {
-			return diag.FromErr(fmt.Errorf("stdout error: %s", stderr))
-		}
-
-		if !done {
-			return diag.Errorf("command timed out")
-		}
-
-		reader := csv.NewReader(strings.NewReader(stdout))
-		line, err := reader.Read()
-		if err != nil {
-			diag.FromErr(err)
-		}
-
-		mountpoint[0]["uid"] = line[0]
-		mountpoint[0]["gid"] = line[1]
+	mountpoint := make([]map[string]string, 1)
+	mountpoint[0] = map[string]string{
+		"path":  dataset.mountpoint,
+		"owner": owner.userName,
+		"group": owner.groupName,
+		"uid":   owner.uid,
+		"gid":   owner.gid,
 	}
 
 	d.Set("mountpoint", mountpoint)

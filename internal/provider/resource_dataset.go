@@ -123,31 +123,33 @@ func resourceDatasetCreate(ctx context.Context, d *schema.ResourceData, meta int
 	log.Printf("[DEBUG] committing guid: %s", dataset.guid)
 	d.SetId(dataset.guid)
 
-	if uid := d.Get("mountpoint.uid"); uid != nil {
-		log.Printf("[DEBUG] setting user id (%s) of dataset (%s) mountpoint path", uid, datasetName)
-		if _, err = callSshCommand(ssh, "sudo chown '%s' '%s'", uid.(string), dataset.mountpoint); err != nil {
-			return diag.FromErr(err)
+	if d.Get("mountpoint") != nil {
+		if uid := d.Get("mountpoint").([]interface{})[0].(map[string]interface{})["uid"]; uid != nil && uid.(string) != "" {
+			log.Printf("[DEBUG] setting user id (%s) of dataset (%s) mountpoint path", uid, datasetName)
+			if _, err = callSshCommand(ssh, "sudo chown '%s' '%s'", uid.(string), dataset.mountpoint); err != nil {
+				return diag.FromErr(err)
+			}
 		}
-	}
 
-	if gid := d.Get("mountpoint.gid"); gid != nil {
-		log.Printf("[DEBUG] setting group id (%s) of dataset (%s) mountpoint path", gid, datasetName)
-		if _, err = callSshCommand(ssh, "sudo chgrp '%s' '%s'", gid.(string), dataset.mountpoint); err != nil {
-			return diag.FromErr(err)
+		if gid := d.Get("mountpoint").([]interface{})[0].(map[string]interface{})["gid"]; gid != nil && gid.(string) != "" {
+			log.Printf("[DEBUG] setting group id (%s) of dataset (%s) mountpoint path", gid, datasetName)
+			if _, err = callSshCommand(ssh, "sudo chgrp '%s' '%s'", gid.(string), dataset.mountpoint); err != nil {
+				return diag.FromErr(err)
+			}
 		}
-	}
 
-	if owner := d.Get("mountpoint.owner"); owner != nil {
-		log.Printf("[DEBUG] setting owner (%s) of dataset (%s) mountpoint path", owner, datasetName)
-		if _, err = callSshCommand(ssh, "sudo chown '%s' '%s'", owner.(string), dataset.mountpoint); err != nil {
-			return diag.FromErr(err)
+		if owner := d.Get("mountpoint").([]interface{})[0].(map[string]interface{})["owner"]; owner != nil && owner.(string) != "" {
+			log.Printf("[DEBUG] setting owner (%s) of dataset (%s) mountpoint path", owner, datasetName)
+			if _, err = callSshCommand(ssh, "sudo chown '%s' '%s'", owner.(string), dataset.mountpoint); err != nil {
+				return diag.FromErr(err)
+			}
 		}
-	}
 
-	if group := d.Get("mountpoint.group"); group != nil {
-		log.Printf("[DEBUG] setting group name (%s) of dataset (%s) mountpoint path", group, datasetName)
-		if _, err = callSshCommand(ssh, "sudo chgrp '%s' '%s'", group.(string), dataset.mountpoint); err != nil {
-			return diag.FromErr(err)
+		if group := d.Get("mountpoint").([]interface{})[0].(map[string]interface{})["group"]; group != nil && group.(string) != "" {
+			log.Printf("[DEBUG] setting group name (%s) of dataset (%s) mountpoint path", group, datasetName)
+			if _, err = callSshCommand(ssh, "sudo chgrp '%s' '%s'", group.(string), dataset.mountpoint); err != nil {
+				return diag.FromErr(err)
+			}
 		}
 	}
 
