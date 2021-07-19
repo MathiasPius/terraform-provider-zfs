@@ -167,7 +167,7 @@ func resourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta inter
 		// of the zfs resource, in case the name has changed.
 		real_name, err := getDatasetNameByGuid(ssh, id)
 		if err != nil {
-			return diag.FromErr(fmt.Errorf("the dataset %s identified by guid %s could not be found. It was likely deleted on the server outside of terraform.", datasetName, id))
+			return diag.FromErr(fmt.Errorf("the dataset %s identified by guid %s could not be found. It was likely deleted on the server outside of terraform", datasetName, id))
 		}
 		datasetName = *real_name
 	}
