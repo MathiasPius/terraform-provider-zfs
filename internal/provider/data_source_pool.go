@@ -2,12 +2,6 @@ package provider
 
 import (
 	"context"
-	"encoding/csv"
-	"fmt"
-	"io"
-	"log"
-	"strings"
-	"time"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -23,7 +17,7 @@ func dataSourcePool() *schema.Resource {
 		ReadContext: dataSourcePoolRead,
 
 		Schema: map[string]*schema.Schema{
-			"id": {
+			"name": {
 				// This description is used by the documentation generator and the language server.
 				Description: "Name of the zpool.",
 				Type:        schema.TypeString,
@@ -50,41 +44,17 @@ func dataSourcePoolRead(ctx context.Context, d *schema.ResourceData, meta interf
 
 	ssh := meta.(*easyssh.MakeConfig)
 
-	pool_name := d.Get("id").(string)
+	poolName := d.Get("name").(string)
 
-	stdout, stderr, done, err := ssh.Run(fmt.Sprintf("sudo zpool get -H size,capacity %s", pool_name), 60*time.Second)
-
+	pool, err := describePool(ssh, poolName)
 	if err != nil {
 		return diag.FromErr(err)
 	}
 
-	if stderr != "" {
-		return diag.FromErr(fmt.Errorf("stdout error: %s", stderr))
-	}
-
-	if !done {
-		return diag.Errorf("command timed out")
-	}
-
-	reader := csv.NewReader(strings.NewReader(stdout))
-	reader.Comma = '\t'
-
-	for {
-		line, err := reader.Read()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			diag.FromErr(err)
-		}
-
-		log.Printf("[DEBUG] CSV line: %s", line)
-
-		if err := d.Set(line[1], line[2]); err != nil {
-			return diag.FromErr(err)
-		}
-	}
-
-	d.SetId(pool_name)
+	d.Set("name", poolName)
+	d.Set("size", pool.size)
+	d.Set("capacity", pool.capacity)
+	d.SetId(pool.guid)
 
 	return diags
 }

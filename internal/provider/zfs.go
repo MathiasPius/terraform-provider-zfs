@@ -25,8 +25,8 @@ func updateOption(ssh *easyssh.MakeConfig, datasetName string, option string, va
 	return callSshCommand(ssh, "sudo zfs set %s=%s %s", option, value, datasetName)
 }
 
-func getDatasetNameByGuid(ssh *easyssh.MakeConfig, guid string) (*string, error) {
-	stdout, err := callSshCommand(ssh, "sudo zfs list -H -o name,guid")
+func getZfsResourceNameByGuid(ssh *easyssh.MakeConfig, resource_type string, guid string) (*string, error) {
+	stdout, err := callSshCommand(ssh, "sudo %s list -H -o name,guid", resource_type)
 
 	if err != nil {
 		return nil, err
@@ -43,13 +43,24 @@ func getDatasetNameByGuid(ssh *easyssh.MakeConfig, guid string) (*string, error)
 			return nil, err
 		}
 		if line[1] == guid {
-			log.Printf("[DEBUG] found dataset by guid: %s", line[0])
+			log.Printf("[DEBUG] found resource by guid: %s", line[0])
 			return &line[0], nil
 		}
 	}
 
-	return nil, fmt.Errorf("no dataset found with guid %s", guid)
+	return nil, fmt.Errorf("no resource found with guid %s", guid)
 }
+
+func getDatasetNameByGuid(ssh *easyssh.MakeConfig, guid string) (*string, error) {
+	return getZfsResourceNameByGuid(ssh, "zfs", guid)
+}
+
+/*
+Will be used when/if a pool resource is added
+func getPoolNameByGuid(ssh *easyssh.MakeConfig, guid string) (*string, error) {
+	return getZfsResourceNameByGuid(ssh, "zpool", guid)
+}
+*/
 
 func describeDataset(ssh *easyssh.MakeConfig, datasetName string) (*Dataset, error) {
 	stdout, err := callSshCommand(ssh, "sudo zfs get -H all %s", datasetName)
@@ -91,6 +102,46 @@ func describeDataset(ssh *easyssh.MakeConfig, datasetName string) (*Dataset, err
 	}
 
 	return &dataset, nil
+}
+
+type Pool struct {
+	guid     string
+	size     string
+	capacity string
+}
+
+func describePool(ssh *easyssh.MakeConfig, poolname string) (*Pool, error) {
+	stdout, err := callSshCommand(ssh, "sudo zpool get -H all %s", poolname)
+
+	if err != nil {
+		return nil, err
+	}
+
+	reader := csv.NewReader(strings.NewReader(stdout))
+	reader.Comma = '\t'
+
+	pool := Pool{}
+	for {
+		line, err := reader.Read()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return nil, err
+		}
+
+		switch line[1] {
+		case "size":
+			pool.size = line[2]
+		case "capacity":
+			pool.capacity = line[2]
+		case "guid":
+			pool.guid = line[2]
+		default:
+			// do nothing
+		}
+	}
+
+	return &pool, nil
 }
 
 type CreateDataset struct {

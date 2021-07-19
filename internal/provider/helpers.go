@@ -33,3 +33,27 @@ func callSshCommand(ssh *easyssh.MakeConfig, cmd string, args ...interface{}) (s
 
 	return stdout, nil
 }
+
+type Ownership struct {
+	userName  string
+	groupName string
+	uid       string
+	gid       string
+}
+
+func getFileOwnership(ssh *easyssh.MakeConfig, path string) (*Ownership, error) {
+	output, err := callSshCommand(ssh, "sudo stat -c '%%U,%%G,%%u,%%g' '%s'", path)
+
+	if err != nil {
+		return nil, err
+	}
+
+	values := strings.Split(strings.TrimSuffix(output, "\n"), ",")
+
+	return &Ownership{
+		userName:  values[0],
+		groupName: values[1],
+		uid:       values[2],
+		gid:       values[3],
+	}, nil
+}

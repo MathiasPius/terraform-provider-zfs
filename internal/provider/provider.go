@@ -30,37 +30,37 @@ func New(version string) func() *schema.Provider {
 	return func() *schema.Provider {
 		p := &schema.Provider{
 			Schema: map[string]*schema.Schema{
-				"user": &schema.Schema{
+				"user": {
 					Type:        schema.TypeString,
 					Required:    true,
 					DefaultFunc: schema.EnvDefaultFunc("ZFS_PROVIDER_USERNAME", nil),
 				},
-				"host": &schema.Schema{
+				"host": {
 					Type:        schema.TypeString,
 					Required:    true,
 					DefaultFunc: schema.EnvDefaultFunc("ZFS_PROVIDER_HOSTNAME", nil),
 				},
-				"port": &schema.Schema{
+				"port": {
 					Type:        schema.TypeString,
 					Required:    true,
 					DefaultFunc: schema.EnvDefaultFunc("ZFS_PROVIDER_PORT", "22"),
 				},
-				"key": &schema.Schema{
+				"key": {
 					Type:        schema.TypeString,
 					Optional:    true,
 					DefaultFunc: schema.EnvDefaultFunc("ZFS_PROVIDER_KEY", nil),
 				},
-				"key_path": &schema.Schema{
+				"key_path": {
 					Type:        schema.TypeString,
 					Optional:    true,
 					DefaultFunc: schema.EnvDefaultFunc("ZFS_PROVIDER_KEY_PATH", nil),
 				},
-				"key_passphrase": &schema.Schema{
+				"key_passphrase": {
 					Type:        schema.TypeString,
 					Optional:    true,
 					DefaultFunc: schema.EnvDefaultFunc("ZFS_PROVIDER_KEY_PASSPHRASE", nil),
 				},
-				"password": &schema.Schema{
+				"password": {
 					Type:        schema.TypeString,
 					Optional:    true,
 					DefaultFunc: schema.EnvDefaultFunc("ZFS_PROVIDER_PASSWORD", nil),
