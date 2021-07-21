@@ -110,7 +110,7 @@ func resourceDatasetCreate(ctx context.Context, d *schema.ResourceData, meta int
 	}
 
 	mountpoint := ""
-	if d.Get("mountpoint") != nil && d.Get("mountpoint").(string) != "" {
+	if d.Get("mountpoint") != nil && d.Get("mountpoint").([]interface{})[0].(map[string]interface{})["path"] != nil && d.Get("mountpoint").([]interface{})[0].(map[string]interface{})["path"].(string) != "" {
 		mountpoint = d.Get("mountpoint").([]interface{})[0].(map[string]interface{})["path"].(string)
 	}
 
