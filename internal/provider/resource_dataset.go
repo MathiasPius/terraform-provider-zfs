@@ -178,21 +178,23 @@ func resourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta inter
 		return diag.FromErr(err)
 	}
 
-	owner, err := getFileOwnership(ssh, dataset.mountpoint)
-	if err != nil {
-		return diag.FromErr(err)
-	}
+	if dataset.mountpoint != "legacy" && dataset.mountpoint != "none" {
+		owner, err := getFileOwnership(ssh, dataset.mountpoint)
+		if err != nil {
+			return diag.FromErr(err)
+		}
 
-	mountpoint := make([]map[string]string, 1)
-	mountpoint[0] = map[string]string{
-		"path":  dataset.mountpoint,
-		"owner": owner.userName,
-		"group": owner.groupName,
-		"uid":   owner.uid,
-		"gid":   owner.gid,
-	}
+		mountpoint := make([]map[string]string, 1)
+		mountpoint[0] = map[string]string{
+			"path":  dataset.mountpoint,
+			"owner": owner.userName,
+			"group": owner.groupName,
+			"uid":   owner.uid,
+			"gid":   owner.gid,
+		}
 
-	d.Set("mountpoint", mountpoint)
+		d.Set("mountpoint", mountpoint)
+	}
 	d.SetId(dataset.guid)
 
 	return diags
