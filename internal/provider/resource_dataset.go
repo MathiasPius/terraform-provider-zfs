@@ -53,7 +53,7 @@ func resourceDataset() *schema.Resource {
 						},
 						"uid": {
 							Description:   "Set owner of the mountpoint. Must be a valid uid",
-							Type:          schema.TypeString,
+							Type:          schema.TypeInt,
 							Optional:      true,
 							Computed:      true,
 							ConflictsWith: []string{"mountpoint.owner"},
@@ -67,7 +67,7 @@ func resourceDataset() *schema.Resource {
 						},
 						"gid": {
 							Description:   "Set group of the mountpoint. Must be a valid gid",
-							Type:          schema.TypeString,
+							Type:          schema.TypeInt,
 							Optional:      true,
 							Computed:      true,
 							ConflictsWith: []string{"mountpoint.group"},
@@ -129,16 +129,16 @@ func resourceDatasetCreate(ctx context.Context, d *schema.ResourceData, meta int
 	d.SetId(dataset.guid)
 
 	if d.Get("mountpoint") != nil {
-		if uid := d.Get("mountpoint").([]interface{})[0].(map[string]interface{})["uid"]; uid != nil && uid.(string) != "" {
+		if uid := d.Get("mountpoint").([]interface{})[0].(map[string]interface{})["uid"]; uid != nil {
 			log.Printf("[DEBUG] setting user id (%s) of dataset (%s) mountpoint path", uid, datasetName)
-			if _, err = callSshCommand(ssh, "sudo chown '%s' '%s'", uid.(string), dataset.mountpoint); err != nil {
+			if _, err = callSshCommand(ssh, "sudo chown '%s' '%s'", uid.(int), dataset.mountpoint); err != nil {
 				return diag.FromErr(err)
 			}
 		}
 
-		if gid := d.Get("mountpoint").([]interface{})[0].(map[string]interface{})["gid"]; gid != nil && gid.(string) != "" {
+		if gid := d.Get("mountpoint").([]interface{})[0].(map[string]interface{})["gid"]; gid != nil {
 			log.Printf("[DEBUG] setting group id (%s) of dataset (%s) mountpoint path", gid, datasetName)
-			if _, err = callSshCommand(ssh, "sudo chgrp '%s' '%s'", gid.(string), dataset.mountpoint); err != nil {
+			if _, err = callSshCommand(ssh, "sudo chgrp '%s' '%s'", gid.(int), dataset.mountpoint); err != nil {
 				return diag.FromErr(err)
 			}
 		}
@@ -189,8 +189,8 @@ func resourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta inter
 			return diag.FromErr(err)
 		}
 
-		mountpoint := make([]map[string]string, 1)
-		mountpoint[0] = map[string]string{
+		mountpoint := make([]map[string]interface{}, 1)
+		mountpoint[0] = map[string]interface{}{
 			"path":  dataset.mountpoint,
 			"owner": owner.userName,
 			"group": owner.groupName,
@@ -238,9 +238,9 @@ func resourceDatasetUpdate(ctx context.Context, d *schema.ResourceData, meta int
 			// If the value has changed, and is now nil, then it should be reset to default
 			uid := d.Get("mountpoint").([]interface{})[0].(map[string]interface{})["uid"]
 			if uid == nil {
-				uid = "0"
+				uid = 0
 			} else {
-				uid = uid.(string)
+				uid = uid.(int)
 			}
 			log.Printf("[DEBUG] setting user id (%s) of dataset (%s) mountpoint path", uid, datasetName)
 			if _, err = callSshCommand(ssh, "sudo chown '%s' '%s'", uid, mountpoint); err != nil {
@@ -250,18 +250,23 @@ func resourceDatasetUpdate(ctx context.Context, d *schema.ResourceData, meta int
 			// If the value has changed, and is now nil, then it should be reset to default
 			gid := d.Get("mountpoint").([]interface{})[0].(map[string]interface{})["gid"]
 			if gid == nil {
-				gid = "0"
+				gid = 0
 			} else {
-				gid = gid.(string)
+				gid = gid.(int)
 			}
 			log.Printf("[DEBUG] setting group id (%s) of dataset (%s) mountpoint path", gid, datasetName)
 			if _, err = callSshCommand(ssh, "sudo chgrp '%s' '%s'", gid, mountpoint); err != nil {
 				return diag.FromErr(err)
 			}
 
+			root_name := "root"
+			if root_name, err = callSshCommand(ssh, "id -nu 0"); err != nil {
+				return diag.FromErr(err)
+			}
+
 			owner := d.Get("mountpoint").([]interface{})[0].(map[string]interface{})["owner"]
 			if owner == nil {
-				owner = "0"
+				owner = root_name
 			} else {
 				owner = owner.(string)
 			}
@@ -272,7 +277,7 @@ func resourceDatasetUpdate(ctx context.Context, d *schema.ResourceData, meta int
 
 			group := d.Get("mountpoint").([]interface{})[0].(map[string]interface{})["group"]
 			if group == nil {
-				group = "0"
+				group = root_name
 			} else {
 				group = group.(string)
 			}

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 	"time"
 
@@ -37,8 +38,8 @@ func callSshCommand(ssh *easyssh.MakeConfig, cmd string, args ...interface{}) (s
 type Ownership struct {
 	userName  string
 	groupName string
-	uid       string
-	gid       string
+	uid       int
+	gid       int
 }
 
 func getFileOwnership(ssh *easyssh.MakeConfig, path string) (*Ownership, error) {
@@ -50,10 +51,20 @@ func getFileOwnership(ssh *easyssh.MakeConfig, path string) (*Ownership, error) 
 
 	values := strings.Split(strings.TrimSuffix(output, "\n"), ",")
 
+	uid, err := strconv.Atoi(values[2])
+	if err != nil {
+		return nil, err
+	}
+
+	gid, err := strconv.Atoi(values[3])
+	if err != nil {
+		return nil, err
+	}
+
 	return &Ownership{
 		userName:  values[0],
 		groupName: values[1],
-		uid:       values[2],
-		gid:       values[3],
+		uid:       uid,
+		gid:       gid,
 	}, nil
 }

@@ -42,7 +42,7 @@ func dataSourceDataset() *schema.Resource {
 						},
 						"uid": {
 							Description: "Set owner of the mountpoint. Must be a valid uid",
-							Type:        schema.TypeString,
+							Type:        schema.TypeInt,
 							Computed:    true,
 						},
 						"group": {
@@ -52,7 +52,7 @@ func dataSourceDataset() *schema.Resource {
 						},
 						"gid": {
 							Description: "Set group of the mountpoint. Must be a valid gid",
-							Type:        schema.TypeString,
+							Type:        schema.TypeInt,
 							Computed:    true,
 						},
 					},
@@ -91,21 +91,24 @@ func dataSourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta int
 		}
 	}
 
-	owner, err := getFileOwnership(ssh, dataset.mountpoint)
-	if err != nil {
-		return diag.FromErr(err)
+	if dataset.mountpoint != "" && dataset.mountpoint != "none" && dataset.mountpoint != "legacy" {
+		owner, err := getFileOwnership(ssh, dataset.mountpoint)
+		if err != nil {
+			return diag.FromErr(err)
+		}
+
+		mountpoint := make([]map[string]interface{}, 1)
+		mountpoint[0] = map[string]interface{}{
+			"path":  dataset.mountpoint,
+			"owner": owner.userName,
+			"group": owner.groupName,
+			"uid":   owner.uid,
+			"gid":   owner.gid,
+		}
+
+		d.Set("mountpoint", mountpoint)
 	}
 
-	mountpoint := make([]map[string]string, 1)
-	mountpoint[0] = map[string]string{
-		"path":  dataset.mountpoint,
-		"owner": owner.userName,
-		"group": owner.groupName,
-		"uid":   owner.uid,
-		"gid":   owner.gid,
-	}
-
-	d.Set("mountpoint", mountpoint)
 	d.SetId(dataset.guid)
 
 	return diags
