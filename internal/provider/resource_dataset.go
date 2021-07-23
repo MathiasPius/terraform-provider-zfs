@@ -33,47 +33,38 @@ func resourceDataset() *schema.Resource {
 				Required:    true,
 			},
 			"mountpoint": {
-				// This description is used by the documentation generator and the language server.
 				Description: "Mountpoint of the dataset.",
-				Type:        schema.TypeList,
-				MaxItems:    1,
+				Type:        schema.TypeString,
 				Optional:    true,
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"path": {
-							Type:     schema.TypeString,
-							Required: true,
-						},
-						"owner": {
-							Description:   "Set owner of the mountpoint. Must be a valid username",
-							Type:          schema.TypeString,
-							Optional:      true,
-							Computed:      true,
-							ConflictsWith: []string{"mountpoint.uid"},
-						},
-						"uid": {
-							Description:   "Set owner of the mountpoint. Must be a valid uid",
-							Type:          schema.TypeInt,
-							Optional:      true,
-							Computed:      true,
-							ConflictsWith: []string{"mountpoint.owner"},
-						},
-						"group": {
-							Description:   "Set group of the mountpoint. Must be a valid group name",
-							Type:          schema.TypeString,
-							Optional:      true,
-							Computed:      true,
-							ConflictsWith: []string{"mountpoint.gid"},
-						},
-						"gid": {
-							Description:   "Set group of the mountpoint. Must be a valid gid",
-							Type:          schema.TypeInt,
-							Optional:      true,
-							Computed:      true,
-							ConflictsWith: []string{"mountpoint.group"},
-						},
-					},
-				},
+				Default:     "none",
+			},
+			"owner": {
+				Description:   "Set owner of the mountpoint. Must be a valid username",
+				Type:          schema.TypeString,
+				Optional:      true,
+				ConflictsWith: []string{"uid"},
+				RequiredWith:  []string{"mountpoint"},
+			},
+			"uid": {
+				Description:   "Set owner of the mountpoint. Must be a valid uid",
+				Type:          schema.TypeInt,
+				Optional:      true,
+				ConflictsWith: []string{"owner"},
+				RequiredWith:  []string{"mountpoint"},
+			},
+			"group": {
+				Description:   "Set group of the mountpoint. Must be a valid group name",
+				Type:          schema.TypeString,
+				Optional:      true,
+				ConflictsWith: []string{"gid"},
+				RequiredWith:  []string{"mountpoint"},
+			},
+			"gid": {
+				Description:   "Set group of the mountpoint. Must be a valid gid",
+				Type:          schema.TypeInt,
+				Optional:      true,
+				ConflictsWith: []string{"group"},
+				RequiredWith:  []string{"mountpoint"},
 			},
 		},
 	}
@@ -85,11 +76,10 @@ func resourceDatasetCreate(ctx context.Context, d *schema.ResourceData, meta int
 	datasetName := d.Get("name").(string)
 
 	ssh := meta.(*easyssh.MakeConfig)
-	dataset, err := describeDataset(ssh, datasetName)
 
+	dataset, err := describeDataset(ssh, datasetName)
 	if dataset != nil {
-		// do comparison?
-		log.Println("[DEBUG] zfs dataset exists!")
+		log.Printf("[DEBUG] zfs dataset %s already exists!", datasetName)
 	}
 
 	if err != nil {
@@ -109,11 +99,7 @@ func resourceDatasetCreate(ctx context.Context, d *schema.ResourceData, meta int
 		}
 	}
 
-	mountpoint := ""
-	if d.Get("mountpoint") != nil && d.Get("mountpoint").([]interface{})[0].(map[string]interface{})["path"] != nil && d.Get("mountpoint").([]interface{})[0].(map[string]interface{})["path"].(string) != "" {
-		mountpoint = d.Get("mountpoint").([]interface{})[0].(map[string]interface{})["path"].(string)
-	}
-
+	mountpoint := d.Get("mountpoint").(string)
 	dataset, err = createDataset(ssh, &CreateDataset{
 		name:       datasetName,
 		mountpoint: mountpoint,
@@ -128,31 +114,27 @@ func resourceDatasetCreate(ctx context.Context, d *schema.ResourceData, meta int
 	log.Printf("[DEBUG] committing guid: %s", dataset.guid)
 	d.SetId(dataset.guid)
 
-	if d.Get("mountpoint") != nil {
-		if uid := d.Get("mountpoint").([]interface{})[0].(map[string]interface{})["uid"]; uid != nil {
-			log.Printf("[DEBUG] setting user id (%s) of dataset (%s) mountpoint path", uid, datasetName)
-			if _, err = callSshCommand(ssh, "sudo chown '%d' '%s'", uid.(int), dataset.mountpoint); err != nil {
+	if mountpoint != "none" && mountpoint != "legacy" {
+		if uid, ok := d.GetOk("uid"); ok {
+			if _, err = callSshCommand(ssh, "sudo chown '%d' '%s'", uid.(int), mountpoint); err != nil {
 				return diag.FromErr(err)
 			}
 		}
 
-		if gid := d.Get("mountpoint").([]interface{})[0].(map[string]interface{})["gid"]; gid != nil {
-			log.Printf("[DEBUG] setting group id (%s) of dataset (%s) mountpoint path", gid, datasetName)
-			if _, err = callSshCommand(ssh, "sudo chgrp '%d' '%s'", gid.(int), dataset.mountpoint); err != nil {
+		if gid, ok := d.GetOk("gid"); ok {
+			if _, err = callSshCommand(ssh, "sudo chgrp '%d' '%s'", gid.(int), mountpoint); err != nil {
 				return diag.FromErr(err)
 			}
 		}
 
-		if owner := d.Get("mountpoint").([]interface{})[0].(map[string]interface{})["owner"]; owner != nil && owner.(string) != "" {
-			log.Printf("[DEBUG] setting owner (%s) of dataset (%s) mountpoint path", owner, datasetName)
-			if _, err = callSshCommand(ssh, "sudo chown '%s' '%s'", owner.(string), dataset.mountpoint); err != nil {
+		if owner, ok := d.GetOk("owner"); ok {
+			if _, err = callSshCommand(ssh, "sudo chown '%s' '%s'", owner.(string), mountpoint); err != nil {
 				return diag.FromErr(err)
 			}
 		}
 
-		if group := d.Get("mountpoint").([]interface{})[0].(map[string]interface{})["group"]; group != nil && group.(string) != "" {
-			log.Printf("[DEBUG] setting group name (%s) of dataset (%s) mountpoint path", group, datasetName)
-			if _, err = callSshCommand(ssh, "sudo chgrp '%s' '%s'", group.(string), dataset.mountpoint); err != nil {
+		if group, ok := d.GetOk("group"); ok {
+			if _, err = callSshCommand(ssh, "sudo chgrp '%s' '%s'", group.(string), mountpoint); err != nil {
 				return diag.FromErr(err)
 			}
 		}
@@ -183,28 +165,39 @@ func resourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta inter
 		return diag.FromErr(err)
 	}
 
-	if dataset.mountpoint != "" && dataset.mountpoint != "legacy" && dataset.mountpoint != "none" {
+	d.Set("mountpoint", dataset.mountpoint)
+
+	if dataset.mountpoint != "none" && dataset.mountpoint != "legacy" {
 		log.Println("[DEBUG] Fetching dataset mountpoint ownership information")
-		owner, err := getFileOwnership(ssh, dataset.mountpoint)
+		ownership, err := getFileOwnership(ssh, dataset.mountpoint)
 		if err != nil {
 			return diag.FromErr(err)
 		}
 
-		mountpoint := make([]map[string]interface{}, 1)
-		mountpoint[0] = map[string]interface{}{
-			"path":  dataset.mountpoint,
-			"owner": owner.userName,
-			"group": owner.groupName,
-			"uid":   owner.uid,
-			"gid":   owner.gid,
+		// Ignore any values not explicitly tracked by terraform
+		if _, ok := d.GetOk("owner"); ok {
+			d.Set("owner", ownership.userName)
 		}
 
-		d.Set("mountpoint", mountpoint)
-	} else {
-		d.Set("mountpoint", nil)
-	}
-	d.SetId(dataset.guid)
+		if _, ok := d.GetOk("group"); ok {
+			d.Set("group", ownership.groupName)
+		}
 
+		if _, ok := d.GetOk("gid"); ok {
+			d.Set("gid", ownership.gid)
+		}
+
+		if _, ok := d.GetOk("uid"); ok {
+			d.Set("uid", ownership.uid)
+		}
+	} else {
+		d.Set("owner", nil)
+		d.Set("group", nil)
+		d.Set("gid", nil)
+		d.Set("uid", nil)
+	}
+
+	d.SetId(dataset.guid)
 	return diags
 }
 
@@ -216,8 +209,6 @@ func resourceDatasetUpdate(ctx context.Context, d *schema.ResourceData, meta int
 	}
 
 	datasetName := d.Get("name").(string)
-	d.Partial(true)
-
 	// Rename the dataset
 	if datasetName != *old_name {
 		if err := renameDataset(ssh, *old_name, datasetName); err != nil {
@@ -225,77 +216,62 @@ func resourceDatasetUpdate(ctx context.Context, d *schema.ResourceData, meta int
 		}
 	}
 
-	// Change mountpoint
-	if d.HasChange("mountpoint") {
-		log.Println("[DEBUG] No changes to mountpoint")
-		if d.Get("mountpoint") == nil || len(d.Get("mountpoint").([]interface{})) == 0 {
-			if _, err := updateOption(ssh, datasetName, "mountpoint", "none"); err != nil {
+	if mountpoint, ok := d.GetOk("mountpoint"); ok {
+		if d.HasChange("mountpoint") {
+			if _, err := updateOption(ssh, datasetName, "mountpoint", mountpoint.(string)); err != nil {
 				return diag.FromErr(err)
+			}
+
+			if uid, ok := d.GetOk("uid"); ok {
+				if _, err = callSshCommand(ssh, "sudo chown '%d' '%s'", uid.(int), mountpoint.(string)); err != nil {
+					return diag.FromErr(err)
+				}
+			}
+
+			if gid, ok := d.GetOk("gid"); ok {
+				if _, err = callSshCommand(ssh, "sudo chgrp '%d' '%s'", gid.(int), mountpoint.(string)); err != nil {
+					return diag.FromErr(err)
+				}
+			}
+
+			if owner, ok := d.GetOk("owner"); ok {
+				if _, err = callSshCommand(ssh, "sudo chown '%s' '%s'", owner.(string), mountpoint.(string)); err != nil {
+					return diag.FromErr(err)
+				}
+			}
+
+			if group, ok := d.GetOk("group"); ok {
+				if _, err = callSshCommand(ssh, "sudo chgrp '%s' '%s'", group.(string), mountpoint.(string)); err != nil {
+					return diag.FromErr(err)
+				}
 			}
 		} else {
-			log.Println("[DEBUG] Mountpoint has been modified, applying changes.")
-			want := d.Get("mountpoint").([]interface{})[0].(map[string]interface{})
+			if uid, ok := d.GetOk("uid"); d.HasChange("uid") && ok {
+				if _, err = callSshCommand(ssh, "sudo chgrp '%d' '%s'", uid.(int), mountpoint.(string)); err != nil {
+					return diag.FromErr(err)
+				}
+			}
+		}
 
-			mountpoint := want["path"].(string)
-			log.Println("[DEBUG] updating path!")
-			if _, err := updateOption(ssh, datasetName, "mountpoint", mountpoint); err != nil {
+		if gid, ok := d.GetOk("gid"); d.HasChange("gid") && ok {
+			if _, err = callSshCommand(ssh, "sudo chgrp '%d' '%s'", gid.(int), mountpoint.(string)); err != nil {
 				return diag.FromErr(err)
 			}
+		}
 
-			// If the value has changed, and is now nil, then it should be reset to default
-			uid := want["uid"]
-			if uid == nil {
-				uid = 0
-			} else {
-				uid = uid.(int)
-			}
-			log.Printf("[DEBUG] setting user id (%s) of dataset (%s) mountpoint path", uid, datasetName)
-			if _, err = callSshCommand(ssh, "sudo chown '%d' '%s'", uid, mountpoint); err != nil {
+		if owner, ok := d.GetOk("owner"); d.HasChange("owner") && ok {
+			if _, err = callSshCommand(ssh, "sudo chown '%s' '%s'", owner.(string), mountpoint.(string)); err != nil {
 				return diag.FromErr(err)
 			}
+		}
 
-			// If the value has changed, and is now nil, then it should be reset to default
-			gid := want["gid"]
-			if gid == nil {
-				gid = 0
-			} else {
-				gid = gid.(int)
-			}
-			log.Printf("[DEBUG] setting group id (%s) of dataset (%s) mountpoint path", gid, datasetName)
-			if _, err = callSshCommand(ssh, "sudo chgrp '%d' '%s'", gid, mountpoint); err != nil {
-				return diag.FromErr(err)
-			}
-
-			root_name := "root"
-			if root_name, err = callSshCommand(ssh, "sudo whoami"); err != nil {
-				return diag.FromErr(err)
-			}
-
-			owner := want["owner"]
-			if owner == nil {
-				owner = root_name
-			} else {
-				owner = owner.(string)
-			}
-			log.Printf("[DEBUG] setting owner (%s) of dataset (%s) mountpoint path", owner, datasetName)
-			if _, err = callSshCommand(ssh, "sudo chown '%s' '%s'", owner, mountpoint); err != nil {
-				return diag.FromErr(err)
-			}
-
-			group := want["group"]
-			if group == nil {
-				group = root_name
-			} else {
-				group = group.(string)
-			}
-			log.Printf("[DEBUG] setting group name (%s) of dataset (%s) mountpoint path", group, datasetName)
-			if _, err = callSshCommand(ssh, "sudo chgrp '%s' '%s'", group, mountpoint); err != nil {
+		if group, ok := d.GetOk("group"); d.HasChange("group") && ok {
+			if _, err = callSshCommand(ssh, "sudo chgrp '%s' '%s'", group.(string), mountpoint.(string)); err != nil {
 				return diag.FromErr(err)
 			}
 		}
 	}
 
-	d.Partial(false)
 	return resourceDatasetRead(ctx, d, meta)
 }
 

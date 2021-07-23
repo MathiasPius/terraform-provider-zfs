@@ -32,7 +32,7 @@ func callSshCommand(ssh *easyssh.MakeConfig, cmd string, args ...interface{}) (s
 		return "", &SshConnectError{inner: errors.New("command timed out")}
 	}
 
-	return stdout, nil
+	return strings.TrimSuffix(stdout, "\n"), nil
 }
 
 type Ownership struct {
@@ -49,7 +49,7 @@ func getFileOwnership(ssh *easyssh.MakeConfig, path string) (*Ownership, error) 
 		return nil, err
 	}
 
-	values := strings.Split(strings.TrimSuffix(output, "\n"), ",")
+	values := strings.Split(output, ",")
 
 	uid, err := strconv.Atoi(values[2])
 	if err != nil {
