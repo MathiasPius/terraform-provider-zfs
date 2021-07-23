@@ -181,20 +181,10 @@ func createDataset(ssh *easyssh.MakeConfig, dataset *CreateDataset) (*Dataset, e
 
 func destroyDataset(ssh *easyssh.MakeConfig, datasetName string) error {
 	_, err := callSshCommand(ssh, "sudo zfs destroy -r %s", datasetName)
-
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func renameDataset(ssh *easyssh.MakeConfig, oldName string, newName string) error {
 	_, err := callSshCommand(ssh, "sudo zfs rename %s %s", oldName, newName)
-
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
