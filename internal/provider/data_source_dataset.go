@@ -25,38 +25,29 @@ func dataSourceDataset() *schema.Resource {
 				Required:    true,
 			},
 			"mountpoint": {
-				// This description is used by the documentation generator and the language server.
 				Description: "Mountpoint of the dataset.",
-				Type:        schema.TypeList,
+				Type:        schema.TypeString,
 				Computed:    true,
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"path": {
-							Type:     schema.TypeString,
-							Computed: true,
-						},
-						"owner": {
-							Description: "Set owner of the mountpoint. Must be a valid username",
-							Type:        schema.TypeString,
-							Computed:    true,
-						},
-						"uid": {
-							Description: "Set owner of the mountpoint. Must be a valid uid",
-							Type:        schema.TypeInt,
-							Computed:    true,
-						},
-						"group": {
-							Description: "Set group of the mountpoint. Must be a valid group name",
-							Type:        schema.TypeString,
-							Computed:    true,
-						},
-						"gid": {
-							Description: "Set group of the mountpoint. Must be a valid gid",
-							Type:        schema.TypeInt,
-							Computed:    true,
-						},
-					},
-				},
+			},
+			"owner": {
+				Description: "Username of the owner of the mountpoint",
+				Type:        schema.TypeString,
+				Computed:    true,
+			},
+			"uid": {
+				Description: "uid of the owner of the mountpoint",
+				Type:        schema.TypeInt,
+				Computed:    true,
+			},
+			"group": {
+				Description: "Name of the group owning the mountpoint",
+				Type:        schema.TypeString,
+				Computed:    true,
+			},
+			"gid": {
+				Description: "gid of the group owning the mountpoint.",
+				Type:        schema.TypeInt,
+				Computed:    true,
 			},
 		},
 	}
@@ -91,25 +82,20 @@ func dataSourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta int
 		}
 	}
 
+	d.SetId(dataset.guid)
+
 	if dataset.mountpoint != "" && dataset.mountpoint != "none" && dataset.mountpoint != "legacy" {
 		owner, err := getFileOwnership(ssh, dataset.mountpoint)
 		if err != nil {
 			return diag.FromErr(err)
 		}
 
-		mountpoint := make([]map[string]interface{}, 1)
-		mountpoint[0] = map[string]interface{}{
-			"path":  dataset.mountpoint,
-			"owner": owner.userName,
-			"group": owner.groupName,
-			"uid":   owner.uid,
-			"gid":   owner.gid,
-		}
-
-		d.Set("mountpoint", mountpoint)
+		d.Set("owner", owner.userName)
+		d.Set("group", owner.groupName)
+		d.Set("uid", owner.uid)
+		d.Set("gid", owner.gid)
+		d.Set("mountpoint", dataset.mountpoint)
 	}
-
-	d.SetId(dataset.guid)
 
 	return diags
 }
