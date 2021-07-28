@@ -25,15 +25,10 @@ Data about a specific dataset.
 
 ### Read-Only
 
-- **mountpoint** (Set of Object) Mountpoint of the dataset. (see [below for nested schema](#nestedatt--mountpoint))
-
-<a id="nestedatt--mountpoint"></a>
-### Nested Schema for `mountpoint`
-
-Read-Only:
-
-- **gid** (String)
-- **path** (String)
-- **uid** (String)
+- **gid** (Number) gid of the group owning the mountpoint.
+- **group** (String) Name of the group owning the mountpoint
+- **mountpoint** (String) Mountpoint of the dataset.
+- **owner** (String) Username of the owner of the mountpoint
+- **uid** (Number) uid of the owner of the mountpoint
 
 

@@ -1,3 +1,8 @@
-resource "zfs_dataset" "example" {
-  sample_attribute = "foo"
+resource "zfs_dataset" "homedir" {
+  name = "dpool/DATA/myuser"
+  mountpoint {
+    path = "/home/myuser"
+    uid  = 2519
+    gid  = 2519
+  }
 }

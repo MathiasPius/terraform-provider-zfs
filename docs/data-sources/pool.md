@@ -17,7 +17,11 @@ Sample data source in the Terraform provider scaffolding.
 
 ### Required
 
-- **id** (String) Name of the zpool.
+- **name** (String) Name of the zpool.
+
+### Optional
+
+- **id** (String) The ID of this resource.
 
 ### Read-Only
 

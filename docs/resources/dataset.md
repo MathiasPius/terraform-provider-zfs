@@ -13,8 +13,13 @@ zfs dataset resource.
 ## Example Usage
 
 ```terraform
-resource "zfs_dataset" "example" {
-  sample_attribute = "foo"
+resource "zfs_dataset" "homedir" {
+  name = "dpool/DATA/myuser"
+  mountpoint {
+    path = "/home/myuser"
+    uid  = 2519
+    gid  = 2519
+  }
 }
 ```
 
@@ -27,26 +32,11 @@ resource "zfs_dataset" "example" {
 
 ### Optional
 
+- **gid** (Number) Set group of the mountpoint. Must be a valid gid
+- **group** (String) Set group of the mountpoint. Must be a valid group name
 - **id** (String) The ID of this resource.
-- **mountpoint** (Block Set, Max: 1) Mountpoint of the dataset. (see [below for nested schema](#nestedblock--mountpoint))
-
-<a id="nestedblock--mountpoint"></a>
-### Nested Schema for `mountpoint`
-
-Required:
-
-- **path** (String)
-
-Optional:
-
-- **create** (Block Set, Max: 1) If specified, will create the mountpoint if it does not exist (see [below for nested schema](#nestedblock--mountpoint--create))
-
-<a id="nestedblock--mountpoint--create"></a>
-### Nested Schema for `mountpoint.create`
-
-Optional:
-
-- **gid** (String)
-- **uid** (String)
+- **mountpoint** (String) Mountpoint of the dataset.
+- **owner** (String) Set owner of the mountpoint. Must be a valid username
+- **uid** (Number) Set owner of the mountpoint. Must be a valid uid
 
 
