@@ -49,10 +49,18 @@ func dataSourcePoolRead(ctx context.Context, d *schema.ResourceData, meta interf
 		return diag.FromErr(err)
 	}
 
-	d.Set("name", poolName)
-	d.Set("size", pool.size)
-	d.Set("capacity", pool.capacity)
-	d.SetId(pool.guid)
+	if err = d.Set("name", poolName); err != nil {
+		return diag.FromErr(err)
+	}
 
+	if err = d.Set("size", pool.size); err != nil {
+		return diag.FromErr(err)
+	}
+
+	if err = d.Set("capacity", pool.capacity); err != nil {
+		return diag.FromErr(err)
+	}
+
+	d.SetId(pool.guid)
 	return diags
 }

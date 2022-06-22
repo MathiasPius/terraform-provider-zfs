@@ -156,14 +156,19 @@ func resourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta inter
 		}
 		datasetName = *real_name
 	}
-	d.Set("name", datasetName)
+
+	if err := d.Set("name", datasetName); err != nil {
+		return diag.FromErr(err)
+	}
 
 	dataset, err := describeDataset(config, datasetName)
 	if err != nil {
 		return diag.FromErr(err)
 	}
 
-	d.Set("mountpoint", dataset.mountpoint)
+	if err = d.Set("mountpoint", dataset.mountpoint); err != nil {
+		return diag.FromErr(err)
+	}
 
 	if dataset.mountpoint != "none" && dataset.mountpoint != "legacy" {
 		log.Println("[DEBUG] Fetching dataset mountpoint ownership information")
@@ -174,25 +179,44 @@ func resourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta inter
 
 		// Ignore any values not explicitly tracked by terraform
 		if _, ok := d.GetOk("owner"); ok {
-			d.Set("owner", ownership.userName)
+			if err = d.Set("owner", ownership.userName); err != nil {
+				return diag.FromErr(err)
+			}
 		}
 
 		if _, ok := d.GetOk("group"); ok {
-			d.Set("group", ownership.groupName)
+			if err = d.Set("group", ownership.groupName); err != nil {
+				return diag.FromErr(err)
+			}
 		}
 
 		if _, ok := d.GetOk("gid"); ok {
-			d.Set("gid", ownership.gid)
+			if err = d.Set("gid", ownership.gid); err != nil {
+				return diag.FromErr(err)
+			}
 		}
 
 		if _, ok := d.GetOk("uid"); ok {
-			d.Set("uid", ownership.uid)
+			if err = d.Set("uid", ownership.uid); err != nil {
+				return diag.FromErr(err)
+			}
 		}
 	} else {
-		d.Set("owner", nil)
-		d.Set("group", nil)
-		d.Set("gid", nil)
-		d.Set("uid", nil)
+		if err = d.Set("owner", nil); err != nil {
+			return diag.FromErr(err)
+		}
+
+		if err = d.Set("group", nil); err != nil {
+			return diag.FromErr(err)
+		}
+
+		if err = d.Set("gid", nil); err != nil {
+			return diag.FromErr(err)
+		}
+
+		if err = d.Set("uid", nil); err != nil {
+			return diag.FromErr(err)
+		}
 	}
 
 	d.SetId(dataset.guid)

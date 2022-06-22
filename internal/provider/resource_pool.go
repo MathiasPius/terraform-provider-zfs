@@ -33,14 +33,6 @@ var mirrorSchema = &schema.Resource{
 	},
 }
 
-type Device struct {
-	path string
-}
-
-type Mirror struct {
-	device []Device
-}
-
 func resourcePool() *schema.Resource {
 	return &schema.Resource{
 		// This description is used by the documentation generator and the language server.
@@ -152,7 +144,10 @@ func resourcePoolRead(ctx context.Context, d *schema.ResourceData, meta interfac
 		}
 		poolName = *real_name
 	}
-	d.Set("name", poolName)
+
+	if err := d.Set("name", poolName); err != nil {
+		diag.FromErr(err)
+	}
 
 	pool, err := describePool(config, poolName)
 	if err != nil {

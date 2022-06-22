@@ -88,11 +88,25 @@ func dataSourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta int
 			return diag.FromErr(err)
 		}
 
-		d.Set("owner", owner.userName)
-		d.Set("group", owner.groupName)
-		d.Set("uid", owner.uid)
-		d.Set("gid", owner.gid)
-		d.Set("mountpoint", dataset.mountpoint)
+		if err := d.Set("owner", owner.userName); err != nil {
+			return diag.FromErr(err)
+		}
+
+		if err = d.Set("group", owner.groupName); err != nil {
+			return diag.FromErr(err)
+		}
+
+		if err = d.Set("uid", owner.uid); err != nil {
+			return diag.FromErr(err)
+		}
+
+		if err = d.Set("gid", owner.gid); err != nil {
+			return diag.FromErr(err)
+		}
+
+		if err = d.Set("mountpoint", dataset.mountpoint); err != nil {
+			return diag.FromErr(err)
+		}
 	}
 
 	return diags
