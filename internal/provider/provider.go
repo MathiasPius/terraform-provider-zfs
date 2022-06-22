@@ -83,6 +83,7 @@ func New(version string) func() *schema.Provider {
 			},
 			ResourcesMap: map[string]*schema.Resource{
 				"zfs_dataset": resourceDataset(),
+				"zfs_pool":    resourcePool(),
 			},
 		}
 

@@ -23,3 +23,11 @@ type DatasetError struct {
 func (e *DatasetError) Error() string {
 	return e.errmsg
 }
+
+type PoolError struct {
+	errmsg string
+}
+
+func (e *PoolError) Error() string {
+	return e.errmsg
+}

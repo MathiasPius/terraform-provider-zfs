@@ -53,12 +53,9 @@ func getDatasetNameByGuid(config *Config, guid string) (*string, error) {
 	return getZfsResourceNameByGuid(config, "zfs", guid)
 }
 
-/*
-Will be used when/if a pool resource is added
-func getPoolNameByGuid(ssh *easyssh.MakeConfig, guid string) (*string, error) {
-	return getZfsResourceNameByGuid(ssh, "zpool", guid)
+func getPoolNameByGuid(config *Config, guid string) (*string, error) {
+	return getZfsResourceNameByGuid(config, "zpool", guid)
 }
-*/
 
 func describeDataset(config *Config, datasetName string) (*Dataset, error) {
 	stdout, err := callSshCommand(config, "zfs get -H all %s", datasetName)
@@ -185,4 +182,40 @@ func destroyDataset(config *Config, datasetName string) error {
 func renameDataset(config *Config, oldName string, newName string) error {
 	_, err := callSshCommand(config, "zfs rename %s %s", oldName, newName)
 	return err
+}
+
+type CreatePool struct {
+	name  string
+	vdevs string
+}
+
+func createPool(config *Config, pool *CreatePool) (*Pool, error) {
+	options := make(map[string]string)
+	/*
+		if pool.mountpoint != "" {
+			options["mountpoint"] = dataset.mountpoint
+		}
+	*/
+
+	serialized_options := ""
+	for k, v := range options {
+		serialized_options = fmt.Sprintf(" -o %s=%s", k, v)
+	}
+
+	_, err := callSshCommand(config, "zpool create %s %s %s", serialized_options, pool.name, pool.vdevs)
+
+	if err != nil {
+		// We might have an error, but it's possible that the dataset was still created
+		fetch_pool, fetcherr := describePool(config, pool.name)
+
+		// This is really dumb, but return both?
+		if fetcherr != nil {
+			return fetch_pool, err
+		}
+
+		return nil, err
+	}
+
+	fetch_pool, fetcherr := describePool(config, pool.name)
+	return fetch_pool, fetcherr
 }
