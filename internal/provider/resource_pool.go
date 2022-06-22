@@ -164,35 +164,34 @@ func resourcePoolRead(ctx context.Context, d *schema.ResourceData, meta interfac
 }
 
 func resourcePoolUpdate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
-	/*
-		config := meta.(*Config)
-			old_name, err := getDatasetNameByGuid(config, d.Id())
-			if err != nil {
-				return diag.FromErr(err)
-			}
+	config := meta.(*Config)
+	old_name, err := getPoolNameByGuid(config, d.Id())
+	if err != nil {
+		return diag.FromErr(err)
+	}
 
-			datasetName := d.Get("name").(string)
-			// Rename the dataset
-			if datasetName != *old_name {
-				if err := renameDataset(config, *old_name, datasetName); err != nil {
-					return diag.FromErr(err)
-				}
-			}
-	*/
+	poolName := d.Get("name").(string)
+	// Rename the dataset
+	if poolName != *old_name {
+		if err := renamePool(config, *old_name, poolName); err != nil {
+			return diag.FromErr(err)
+		}
+	}
 	return resourcePoolRead(ctx, d, meta)
 }
 
 func resourcePoolDelete(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	var diags diag.Diagnostics
-	/*
-		config := meta.(*Config)
-		datasetName := d.Get("name").(string)
 
-		if err := destroyDataset(config, datasetName); err != nil {
-			return diag.FromErr(err)
-		}
+	config := meta.(*Config)
+	poolName := d.Get("name").(string)
+	id := d.Get("id")
 
-		d.SetId("")
-	*/
+	log.Printf("[DEBUG] destroying pool: %s %d", poolName, id)
+	if err := destroyPool(config, poolName); err != nil {
+		return diag.FromErr(err)
+	}
+
+	d.SetId("")
 	return diags
 }

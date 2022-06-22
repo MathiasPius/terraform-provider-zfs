@@ -219,3 +219,19 @@ func createPool(config *Config, pool *CreatePool) (*Pool, error) {
 	fetch_pool, fetcherr := describePool(config, pool.name)
 	return fetch_pool, fetcherr
 }
+
+func renamePool(config *Config, oldName string, newName string) error {
+	_, err := callSshCommand(config, "zpool export %s", oldName)
+	if err != nil {
+		return err
+	}
+
+	_, err = callSshCommand(config, "zpool import %s %s", oldName, newName)
+
+	return err
+}
+
+func destroyPool(config *Config, poolName string) error {
+	_, err := callSshCommand(config, "zpool destroy %s", poolName)
+	return err
+}
