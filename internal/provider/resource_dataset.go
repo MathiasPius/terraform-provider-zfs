@@ -7,8 +7,6 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-
-	"github.com/appleboy/easyssh-proxy"
 )
 
 func resourceDataset() *schema.Resource {
@@ -75,9 +73,9 @@ func resourceDatasetCreate(ctx context.Context, d *schema.ResourceData, meta int
 
 	datasetName := d.Get("name").(string)
 
-	ssh := meta.(*easyssh.MakeConfig)
+	config := meta.(*Config)
 
-	dataset, err := describeDataset(ssh, datasetName)
+	dataset, err := describeDataset(config, datasetName)
 	if dataset != nil {
 		log.Printf("[DEBUG] zfs dataset %s already exists!", datasetName)
 	}
@@ -100,7 +98,7 @@ func resourceDatasetCreate(ctx context.Context, d *schema.ResourceData, meta int
 	}
 
 	mountpoint := d.Get("mountpoint").(string)
-	dataset, err = createDataset(ssh, &CreateDataset{
+	dataset, err = createDataset(config, &CreateDataset{
 		name:       datasetName,
 		mountpoint: mountpoint,
 	})
@@ -116,25 +114,25 @@ func resourceDatasetCreate(ctx context.Context, d *schema.ResourceData, meta int
 
 	if mountpoint != "none" && mountpoint != "legacy" {
 		if uid, ok := d.GetOk("uid"); ok {
-			if _, err = callSshCommand(ssh, "sudo chown '%d' '%s'", uid.(int), mountpoint); err != nil {
+			if _, err = callSshCommand(config, "sudo chown '%d' '%s'", uid.(int), mountpoint); err != nil {
 				return diag.FromErr(err)
 			}
 		}
 
 		if gid, ok := d.GetOk("gid"); ok {
-			if _, err = callSshCommand(ssh, "sudo chgrp '%d' '%s'", gid.(int), mountpoint); err != nil {
+			if _, err = callSshCommand(config, "sudo chgrp '%d' '%s'", gid.(int), mountpoint); err != nil {
 				return diag.FromErr(err)
 			}
 		}
 
 		if owner, ok := d.GetOk("owner"); ok {
-			if _, err = callSshCommand(ssh, "sudo chown '%s' '%s'", owner.(string), mountpoint); err != nil {
+			if _, err = callSshCommand(config, "sudo chown '%s' '%s'", owner.(string), mountpoint); err != nil {
 				return diag.FromErr(err)
 			}
 		}
 
 		if group, ok := d.GetOk("group"); ok {
-			if _, err = callSshCommand(ssh, "sudo chgrp '%s' '%s'", group.(string), mountpoint); err != nil {
+			if _, err = callSshCommand(config, "sudo chgrp '%s' '%s'", group.(string), mountpoint); err != nil {
 				return diag.FromErr(err)
 			}
 		}
@@ -146,13 +144,13 @@ func resourceDatasetCreate(ctx context.Context, d *schema.ResourceData, meta int
 func resourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	var diags diag.Diagnostics
 
-	ssh := meta.(*easyssh.MakeConfig)
+	config := meta.(*Config)
 
 	datasetName := d.Get("name").(string)
 	if id := d.Id(); id != "" {
 		// If we have a Resource ID, then use that to lookup the real name
 		// of the zfs resource, in case the name has changed.
-		real_name, err := getDatasetNameByGuid(ssh, id)
+		real_name, err := getDatasetNameByGuid(config, id)
 		if err != nil {
 			return diag.FromErr(fmt.Errorf("the dataset %s identified by guid %s could not be found. It was likely deleted on the server outside of terraform", datasetName, id))
 		}
@@ -160,7 +158,7 @@ func resourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta inter
 	}
 	d.Set("name", datasetName)
 
-	dataset, err := describeDataset(ssh, datasetName)
+	dataset, err := describeDataset(config, datasetName)
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -169,7 +167,7 @@ func resourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta inter
 
 	if dataset.mountpoint != "none" && dataset.mountpoint != "legacy" {
 		log.Println("[DEBUG] Fetching dataset mountpoint ownership information")
-		ownership, err := getFileOwnership(ssh, dataset.mountpoint)
+		ownership, err := getFileOwnership(config, dataset.mountpoint)
 		if err != nil {
 			return diag.FromErr(err)
 		}
@@ -202,8 +200,8 @@ func resourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta inter
 }
 
 func resourceDatasetUpdate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
-	ssh := meta.(*easyssh.MakeConfig)
-	old_name, err := getDatasetNameByGuid(ssh, d.Id())
+	config := meta.(*Config)
+	old_name, err := getDatasetNameByGuid(config, d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -211,62 +209,62 @@ func resourceDatasetUpdate(ctx context.Context, d *schema.ResourceData, meta int
 	datasetName := d.Get("name").(string)
 	// Rename the dataset
 	if datasetName != *old_name {
-		if err := renameDataset(ssh, *old_name, datasetName); err != nil {
+		if err := renameDataset(config, *old_name, datasetName); err != nil {
 			return diag.FromErr(err)
 		}
 	}
 
 	if mountpoint, ok := d.GetOk("mountpoint"); ok {
 		if d.HasChange("mountpoint") {
-			if _, err := updateOption(ssh, datasetName, "mountpoint", mountpoint.(string)); err != nil {
+			if _, err := updateOption(config, datasetName, "mountpoint", mountpoint.(string)); err != nil {
 				return diag.FromErr(err)
 			}
 
 			if uid, ok := d.GetOk("uid"); ok {
-				if _, err = callSshCommand(ssh, "sudo chown '%d' '%s'", uid.(int), mountpoint.(string)); err != nil {
+				if _, err = callSshCommand(config, "sudo chown '%d' '%s'", uid.(int), mountpoint.(string)); err != nil {
 					return diag.FromErr(err)
 				}
 			}
 
 			if gid, ok := d.GetOk("gid"); ok {
-				if _, err = callSshCommand(ssh, "sudo chgrp '%d' '%s'", gid.(int), mountpoint.(string)); err != nil {
+				if _, err = callSshCommand(config, "sudo chgrp '%d' '%s'", gid.(int), mountpoint.(string)); err != nil {
 					return diag.FromErr(err)
 				}
 			}
 
 			if owner, ok := d.GetOk("owner"); ok {
-				if _, err = callSshCommand(ssh, "sudo chown '%s' '%s'", owner.(string), mountpoint.(string)); err != nil {
+				if _, err = callSshCommand(config, "sudo chown '%s' '%s'", owner.(string), mountpoint.(string)); err != nil {
 					return diag.FromErr(err)
 				}
 			}
 
 			if group, ok := d.GetOk("group"); ok {
-				if _, err = callSshCommand(ssh, "sudo chgrp '%s' '%s'", group.(string), mountpoint.(string)); err != nil {
+				if _, err = callSshCommand(config, "sudo chgrp '%s' '%s'", group.(string), mountpoint.(string)); err != nil {
 					return diag.FromErr(err)
 				}
 			}
 		} else {
 			if uid, ok := d.GetOk("uid"); d.HasChange("uid") && ok {
-				if _, err = callSshCommand(ssh, "sudo chgrp '%d' '%s'", uid.(int), mountpoint.(string)); err != nil {
+				if _, err = callSshCommand(config, "sudo chgrp '%d' '%s'", uid.(int), mountpoint.(string)); err != nil {
 					return diag.FromErr(err)
 				}
 			}
 		}
 
 		if gid, ok := d.GetOk("gid"); d.HasChange("gid") && ok {
-			if _, err = callSshCommand(ssh, "sudo chgrp '%d' '%s'", gid.(int), mountpoint.(string)); err != nil {
+			if _, err = callSshCommand(config, "sudo chgrp '%d' '%s'", gid.(int), mountpoint.(string)); err != nil {
 				return diag.FromErr(err)
 			}
 		}
 
 		if owner, ok := d.GetOk("owner"); d.HasChange("owner") && ok {
-			if _, err = callSshCommand(ssh, "sudo chown '%s' '%s'", owner.(string), mountpoint.(string)); err != nil {
+			if _, err = callSshCommand(config, "sudo chown '%s' '%s'", owner.(string), mountpoint.(string)); err != nil {
 				return diag.FromErr(err)
 			}
 		}
 
 		if group, ok := d.GetOk("group"); d.HasChange("group") && ok {
-			if _, err = callSshCommand(ssh, "sudo chgrp '%s' '%s'", group.(string), mountpoint.(string)); err != nil {
+			if _, err = callSshCommand(config, "sudo chgrp '%s' '%s'", group.(string), mountpoint.(string)); err != nil {
 				return diag.FromErr(err)
 			}
 		}
@@ -277,10 +275,10 @@ func resourceDatasetUpdate(ctx context.Context, d *schema.ResourceData, meta int
 
 func resourceDatasetDelete(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	var diags diag.Diagnostics
-	ssh := meta.(*easyssh.MakeConfig)
+	config := meta.(*Config)
 	datasetName := d.Get("name").(string)
 
-	if err := destroyDataset(ssh, datasetName); err != nil {
+	if err := destroyDataset(config, datasetName); err != nil {
 		return diag.FromErr(err)
 	}
 

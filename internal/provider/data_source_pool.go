@@ -5,8 +5,6 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-
-	"github.com/appleboy/easyssh-proxy"
 )
 
 func dataSourcePool() *schema.Resource {
@@ -42,11 +40,11 @@ func dataSourcePoolRead(ctx context.Context, d *schema.ResourceData, meta interf
 	// client := meta.(*apiClient)
 	var diags diag.Diagnostics
 
-	ssh := meta.(*easyssh.MakeConfig)
+	config := meta.(*Config)
 
 	poolName := d.Get("name").(string)
 
-	pool, err := describePool(ssh, poolName)
+	pool, err := describePool(config, poolName)
 	if err != nil {
 		return diag.FromErr(err)
 	}

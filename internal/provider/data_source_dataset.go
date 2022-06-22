@@ -6,8 +6,6 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-
-	"github.com/appleboy/easyssh-proxy"
 )
 
 func dataSourceDataset() *schema.Resource {
@@ -56,10 +54,10 @@ func dataSourceDataset() *schema.Resource {
 func dataSourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	var diags diag.Diagnostics
 
-	ssh := meta.(*easyssh.MakeConfig)
+	config := meta.(*Config)
 
 	datasetName := d.Get("name").(string)
-	dataset, err := describeDataset(ssh, datasetName)
+	dataset, err := describeDataset(config, datasetName)
 
 	if dataset == nil {
 		log.Println("[DEBUG] zfs dataset does not exist!")
@@ -85,7 +83,7 @@ func dataSourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta int
 	d.SetId(dataset.guid)
 
 	if dataset.mountpoint != "" && dataset.mountpoint != "none" && dataset.mountpoint != "legacy" {
-		owner, err := getFileOwnership(ssh, dataset.mountpoint)
+		owner, err := getFileOwnership(config, dataset.mountpoint)
 		if err != nil {
 			return diag.FromErr(err)
 		}

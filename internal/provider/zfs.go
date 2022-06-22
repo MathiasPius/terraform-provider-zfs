@@ -6,8 +6,6 @@ import (
 	"io"
 	"log"
 	"strings"
-
-	"github.com/appleboy/easyssh-proxy"
 )
 
 type Dataset struct {
@@ -20,13 +18,13 @@ type Dataset struct {
 	mountpoint string
 }
 
-func updateOption(ssh *easyssh.MakeConfig, datasetName string, option string, value string) (string, error) {
+func updateOption(config *Config, datasetName string, option string, value string) (string, error) {
 	log.Printf("[DEBUG] changing zfs option %s for %s to %s", option, datasetName, value)
-	return callSshCommand(ssh, "sudo zfs set %s=%s %s", option, value, datasetName)
+	return callSshCommand(config, "sudo zfs set %s=%s %s", option, value, datasetName)
 }
 
-func getZfsResourceNameByGuid(ssh *easyssh.MakeConfig, resource_type string, guid string) (*string, error) {
-	stdout, err := callSshCommand(ssh, "sudo %s list -H -o name,guid", resource_type)
+func getZfsResourceNameByGuid(config *Config, resource_type string, guid string) (*string, error) {
+	stdout, err := callSshCommand(config, "sudo %s list -H -o name,guid", resource_type)
 
 	if err != nil {
 		return nil, err
@@ -51,8 +49,8 @@ func getZfsResourceNameByGuid(ssh *easyssh.MakeConfig, resource_type string, gui
 	return nil, fmt.Errorf("no resource found with guid %s", guid)
 }
 
-func getDatasetNameByGuid(ssh *easyssh.MakeConfig, guid string) (*string, error) {
-	return getZfsResourceNameByGuid(ssh, "zfs", guid)
+func getDatasetNameByGuid(config *Config, guid string) (*string, error) {
+	return getZfsResourceNameByGuid(config, "zfs", guid)
 }
 
 /*
@@ -62,8 +60,8 @@ func getPoolNameByGuid(ssh *easyssh.MakeConfig, guid string) (*string, error) {
 }
 */
 
-func describeDataset(ssh *easyssh.MakeConfig, datasetName string) (*Dataset, error) {
-	stdout, err := callSshCommand(ssh, "sudo zfs get -H all %s", datasetName)
+func describeDataset(config *Config, datasetName string) (*Dataset, error) {
+	stdout, err := callSshCommand(config, "sudo zfs get -H all %s", datasetName)
 
 	if err != nil {
 		return nil, err
@@ -110,8 +108,8 @@ type Pool struct {
 	capacity string
 }
 
-func describePool(ssh *easyssh.MakeConfig, poolname string) (*Pool, error) {
-	stdout, err := callSshCommand(ssh, "sudo zpool get -H all %s", poolname)
+func describePool(config *Config, poolname string) (*Pool, error) {
+	stdout, err := callSshCommand(config, "sudo zpool get -H all %s", poolname)
 
 	if err != nil {
 		return nil, err
@@ -149,7 +147,7 @@ type CreateDataset struct {
 	mountpoint string
 }
 
-func createDataset(ssh *easyssh.MakeConfig, dataset *CreateDataset) (*Dataset, error) {
+func createDataset(config *Config, dataset *CreateDataset) (*Dataset, error) {
 
 	options := make(map[string]string)
 	if dataset.mountpoint != "" {
@@ -161,11 +159,11 @@ func createDataset(ssh *easyssh.MakeConfig, dataset *CreateDataset) (*Dataset, e
 		serialized_options = fmt.Sprintf(" -o %s=%s", k, v)
 	}
 
-	_, err := callSshCommand(ssh, "sudo zfs create %s %s", serialized_options, dataset.name)
+	_, err := callSshCommand(config, "sudo zfs create %s %s", serialized_options, dataset.name)
 
 	if err != nil {
 		// We might have an error, but it's possible that the dataset was still created
-		fetch_dataset, fetcherr := describeDataset(ssh, dataset.name)
+		fetch_dataset, fetcherr := describeDataset(config, dataset.name)
 
 		// This is really dumb, but return both?
 		if fetcherr != nil {
@@ -175,16 +173,16 @@ func createDataset(ssh *easyssh.MakeConfig, dataset *CreateDataset) (*Dataset, e
 		return nil, err
 	}
 
-	fetch_dataset, fetcherr := describeDataset(ssh, dataset.name)
+	fetch_dataset, fetcherr := describeDataset(config, dataset.name)
 	return fetch_dataset, fetcherr
 }
 
-func destroyDataset(ssh *easyssh.MakeConfig, datasetName string) error {
-	_, err := callSshCommand(ssh, "sudo zfs destroy -r %s", datasetName)
+func destroyDataset(config *Config, datasetName string) error {
+	_, err := callSshCommand(config, "sudo zfs destroy -r %s", datasetName)
 	return err
 }
 
-func renameDataset(ssh *easyssh.MakeConfig, oldName string, newName string) error {
-	_, err := callSshCommand(ssh, "sudo zfs rename %s %s", oldName, newName)
+func renameDataset(config *Config, oldName string, newName string) error {
+	_, err := callSshCommand(config, "sudo zfs rename %s %s", oldName, newName)
 	return err
 }

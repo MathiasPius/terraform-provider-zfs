@@ -26,6 +26,11 @@ func init() {
 	// }
 }
 
+type Config struct {
+	command_prefix string
+	ssh            *easyssh.MakeConfig
+}
+
 func New(version string) func() *schema.Provider {
 	return func() *schema.Provider {
 		p := &schema.Provider{
@@ -65,6 +70,12 @@ func New(version string) func() *schema.Provider {
 					Optional:    true,
 					DefaultFunc: schema.EnvDefaultFunc("ZFS_PROVIDER_PASSWORD", nil),
 				},
+				"command_prefix": {
+					Description: "Can be used to prefix all ssh commands issued on the target host. For example, a command_prefix of 'sudo' can be used to elevate privileges on the target host, assuming password-less sudo is configured for the user",
+					Type:        schema.TypeString,
+					Optional:    true,
+					DefaultFunc: schema.EnvDefaultFunc("ZFS_PROVIDER_COMMAND_PREFIX", nil),
+				},
 			},
 			DataSourcesMap: map[string]*schema.Resource{
 				"zfs_pool":    dataSourcePool(),
@@ -83,15 +94,18 @@ func New(version string) func() *schema.Provider {
 
 func configure(version string, p *schema.Provider) func(context.Context, *schema.ResourceData) (interface{}, diag.Diagnostics) {
 	return func(ctx context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
-		return &easyssh.MakeConfig{
-			Server:     d.Get("host").(string),
-			Port:       d.Get("port").(string),
-			User:       d.Get("user").(string),
-			Key:        d.Get("key").(string),
-			KeyPath:    d.Get("key_path").(string),
-			Password:   d.Get("password").(string),
-			Passphrase: d.Get("key_passphrase").(string),
-			Timeout:    60 * time.Second,
+		return &Config{
+			command_prefix: d.Get("command_prefix").(string),
+			ssh: &easyssh.MakeConfig{
+				Server:     d.Get("host").(string),
+				Port:       d.Get("port").(string),
+				User:       d.Get("user").(string),
+				Key:        d.Get("key").(string),
+				KeyPath:    d.Get("key_path").(string),
+				Password:   d.Get("password").(string),
+				Passphrase: d.Get("key_passphrase").(string),
+				Timeout:    60 * time.Second,
+			},
 		}, nil
 	}
 }

@@ -7,14 +7,12 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/appleboy/easyssh-proxy"
 )
 
-func callSshCommand(ssh *easyssh.MakeConfig, cmd string, args ...interface{}) (string, error) {
+func callSshCommand(config *Config, cmd string, args ...interface{}) (string, error) {
 	cmd = fmt.Sprintf(cmd, args...)
 	log.Printf("[DEBUG] ssh command: %s", cmd)
-	stdout, stderr, done, err := ssh.Run(cmd, 60*time.Second)
+	stdout, stderr, done, err := config.ssh.Run(cmd, 60*time.Second)
 
 	if stderr != "" {
 		if strings.Contains(stderr, "dataset does not exist") {
@@ -42,8 +40,8 @@ type Ownership struct {
 	gid       int
 }
 
-func getFileOwnership(ssh *easyssh.MakeConfig, path string) (*Ownership, error) {
-	output, err := callSshCommand(ssh, "sudo stat -c '%%U,%%G,%%u,%%g' '%s'", path)
+func getFileOwnership(config *Config, path string) (*Ownership, error) {
+	output, err := callSshCommand(config, "sudo stat -c '%%U,%%G,%%u,%%g' '%s'", path)
 
 	if err != nil {
 		return nil, err
