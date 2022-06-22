@@ -71,7 +71,7 @@ func New(version string) func() *schema.Provider {
 					DefaultFunc: schema.EnvDefaultFunc("ZFS_PROVIDER_PASSWORD", nil),
 				},
 				"command_prefix": {
-					Description: "Can be used to prefix all ssh commands issued on the target host. For example, a command_prefix of 'sudo' can be used to elevate privileges on the target host, assuming password-less sudo is configured for the user",
+					Description: "Can be used to prefix all ssh commands issued on the target host. For example, a command_prefix of 'sudo' can be used to elevate privileges on the target host, assuming password-less is configured for the user",
 					Type:        schema.TypeString,
 					Optional:    true,
 					DefaultFunc: schema.EnvDefaultFunc("ZFS_PROVIDER_COMMAND_PREFIX", nil),

@@ -20,11 +20,11 @@ type Dataset struct {
 
 func updateOption(config *Config, datasetName string, option string, value string) (string, error) {
 	log.Printf("[DEBUG] changing zfs option %s for %s to %s", option, datasetName, value)
-	return callSshCommand(config, "sudo zfs set %s=%s %s", option, value, datasetName)
+	return callSshCommand(config, "zfs set %s=%s %s", option, value, datasetName)
 }
 
 func getZfsResourceNameByGuid(config *Config, resource_type string, guid string) (*string, error) {
-	stdout, err := callSshCommand(config, "sudo %s list -H -o name,guid", resource_type)
+	stdout, err := callSshCommand(config, "%s list -H -o name,guid", resource_type)
 
 	if err != nil {
 		return nil, err
@@ -61,7 +61,7 @@ func getPoolNameByGuid(ssh *easyssh.MakeConfig, guid string) (*string, error) {
 */
 
 func describeDataset(config *Config, datasetName string) (*Dataset, error) {
-	stdout, err := callSshCommand(config, "sudo zfs get -H all %s", datasetName)
+	stdout, err := callSshCommand(config, "zfs get -H all %s", datasetName)
 
 	if err != nil {
 		return nil, err
@@ -109,7 +109,7 @@ type Pool struct {
 }
 
 func describePool(config *Config, poolname string) (*Pool, error) {
-	stdout, err := callSshCommand(config, "sudo zpool get -H all %s", poolname)
+	stdout, err := callSshCommand(config, "zpool get -H all %s", poolname)
 
 	if err != nil {
 		return nil, err
@@ -159,7 +159,7 @@ func createDataset(config *Config, dataset *CreateDataset) (*Dataset, error) {
 		serialized_options = fmt.Sprintf(" -o %s=%s", k, v)
 	}
 
-	_, err := callSshCommand(config, "sudo zfs create %s %s", serialized_options, dataset.name)
+	_, err := callSshCommand(config, "zfs create %s %s", serialized_options, dataset.name)
 
 	if err != nil {
 		// We might have an error, but it's possible that the dataset was still created
@@ -178,11 +178,11 @@ func createDataset(config *Config, dataset *CreateDataset) (*Dataset, error) {
 }
 
 func destroyDataset(config *Config, datasetName string) error {
-	_, err := callSshCommand(config, "sudo zfs destroy -r %s", datasetName)
+	_, err := callSshCommand(config, "zfs destroy -r %s", datasetName)
 	return err
 }
 
 func renameDataset(config *Config, oldName string, newName string) error {
-	_, err := callSshCommand(config, "sudo zfs rename %s %s", oldName, newName)
+	_, err := callSshCommand(config, "zfs rename %s %s", oldName, newName)
 	return err
 }

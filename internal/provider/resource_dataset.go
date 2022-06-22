@@ -114,25 +114,25 @@ func resourceDatasetCreate(ctx context.Context, d *schema.ResourceData, meta int
 
 	if mountpoint != "none" && mountpoint != "legacy" {
 		if uid, ok := d.GetOk("uid"); ok {
-			if _, err = callSshCommand(config, "sudo chown '%d' '%s'", uid.(int), mountpoint); err != nil {
+			if _, err = callSshCommand(config, "chown '%d' '%s'", uid.(int), mountpoint); err != nil {
 				return diag.FromErr(err)
 			}
 		}
 
 		if gid, ok := d.GetOk("gid"); ok {
-			if _, err = callSshCommand(config, "sudo chgrp '%d' '%s'", gid.(int), mountpoint); err != nil {
+			if _, err = callSshCommand(config, "chgrp '%d' '%s'", gid.(int), mountpoint); err != nil {
 				return diag.FromErr(err)
 			}
 		}
 
 		if owner, ok := d.GetOk("owner"); ok {
-			if _, err = callSshCommand(config, "sudo chown '%s' '%s'", owner.(string), mountpoint); err != nil {
+			if _, err = callSshCommand(config, "chown '%s' '%s'", owner.(string), mountpoint); err != nil {
 				return diag.FromErr(err)
 			}
 		}
 
 		if group, ok := d.GetOk("group"); ok {
-			if _, err = callSshCommand(config, "sudo chgrp '%s' '%s'", group.(string), mountpoint); err != nil {
+			if _, err = callSshCommand(config, "chgrp '%s' '%s'", group.(string), mountpoint); err != nil {
 				return diag.FromErr(err)
 			}
 		}
@@ -221,50 +221,50 @@ func resourceDatasetUpdate(ctx context.Context, d *schema.ResourceData, meta int
 			}
 
 			if uid, ok := d.GetOk("uid"); ok {
-				if _, err = callSshCommand(config, "sudo chown '%d' '%s'", uid.(int), mountpoint.(string)); err != nil {
+				if _, err = callSshCommand(config, "chown '%d' '%s'", uid.(int), mountpoint.(string)); err != nil {
 					return diag.FromErr(err)
 				}
 			}
 
 			if gid, ok := d.GetOk("gid"); ok {
-				if _, err = callSshCommand(config, "sudo chgrp '%d' '%s'", gid.(int), mountpoint.(string)); err != nil {
+				if _, err = callSshCommand(config, "chgrp '%d' '%s'", gid.(int), mountpoint.(string)); err != nil {
 					return diag.FromErr(err)
 				}
 			}
 
 			if owner, ok := d.GetOk("owner"); ok {
-				if _, err = callSshCommand(config, "sudo chown '%s' '%s'", owner.(string), mountpoint.(string)); err != nil {
+				if _, err = callSshCommand(config, "chown '%s' '%s'", owner.(string), mountpoint.(string)); err != nil {
 					return diag.FromErr(err)
 				}
 			}
 
 			if group, ok := d.GetOk("group"); ok {
-				if _, err = callSshCommand(config, "sudo chgrp '%s' '%s'", group.(string), mountpoint.(string)); err != nil {
+				if _, err = callSshCommand(config, "chgrp '%s' '%s'", group.(string), mountpoint.(string)); err != nil {
 					return diag.FromErr(err)
 				}
 			}
 		} else {
 			if uid, ok := d.GetOk("uid"); d.HasChange("uid") && ok {
-				if _, err = callSshCommand(config, "sudo chgrp '%d' '%s'", uid.(int), mountpoint.(string)); err != nil {
+				if _, err = callSshCommand(config, "chgrp '%d' '%s'", uid.(int), mountpoint.(string)); err != nil {
 					return diag.FromErr(err)
 				}
 			}
 		}
 
 		if gid, ok := d.GetOk("gid"); d.HasChange("gid") && ok {
-			if _, err = callSshCommand(config, "sudo chgrp '%d' '%s'", gid.(int), mountpoint.(string)); err != nil {
+			if _, err = callSshCommand(config, "chgrp '%d' '%s'", gid.(int), mountpoint.(string)); err != nil {
 				return diag.FromErr(err)
 			}
 		}
 
 		if owner, ok := d.GetOk("owner"); d.HasChange("owner") && ok {
-			if _, err = callSshCommand(config, "sudo chown '%s' '%s'", owner.(string), mountpoint.(string)); err != nil {
+			if _, err = callSshCommand(config, "chown '%s' '%s'", owner.(string), mountpoint.(string)); err != nil {
 				return diag.FromErr(err)
 			}
 		}
 
 		if group, ok := d.GetOk("group"); d.HasChange("group") && ok {
-			if _, err = callSshCommand(config, "sudo chgrp '%s' '%s'", group.(string), mountpoint.(string)); err != nil {
+			if _, err = callSshCommand(config, "chgrp '%s' '%s'", group.(string), mountpoint.(string)); err != nil {
 				return diag.FromErr(err)
 			}
 		}

@@ -11,7 +11,7 @@ import (
 
 func callSshCommand(config *Config, cmd string, args ...interface{}) (string, error) {
 	cmd = fmt.Sprintf(cmd, args...)
-	log.Printf("[DEBUG] ssh command: %s", cmd)
+	log.Printf("[DEBUG] ssh command: %s %s", config.command_prefix, cmd)
 	stdout, stderr, done, err := config.ssh.Run(cmd, 60*time.Second)
 
 	if stderr != "" {
@@ -41,7 +41,7 @@ type Ownership struct {
 }
 
 func getFileOwnership(config *Config, path string) (*Ownership, error) {
-	output, err := callSshCommand(config, "sudo stat -c '%%U,%%G,%%u,%%g' '%s'", path)
+	output, err := callSshCommand(config, "stat -c '%%U,%%G,%%u,%%g' '%s'", path)
 
 	if err != nil {
 		return nil, err
