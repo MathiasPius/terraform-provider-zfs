@@ -19,4 +19,4 @@ docker-build: lint
 
 .PHONY: lint
 lint:
-	docker run -it --rm -v $(pwd):/data docker.io/cytopia/golint .
+	docker run --rm -v $(shell pwd):/app -w /app golangci/golangci-lint:v1.46.2 golangci-lint run
