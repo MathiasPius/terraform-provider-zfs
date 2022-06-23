@@ -1,3 +1,4 @@
+
 # This GitHub action can publish assets for release when a tag is created.
 # Currently its setup to run on any tag that matches the pattern "v*" (ie. v0.1.0).
 #
@@ -20,15 +21,16 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v2.3.4
+        uses: actions/checkout@v3
       -
         name: Unshallow
         run: git fetch --prune --unshallow
       -
         name: Set up Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
-          go-version: 1.14
+          go-version-file: 'go.mod'
+          cache: true
       -
         name: Import GPG key
         id: import_gpg
@@ -36,9 +38,10 @@ jobs:
         env:
           # These secrets will need to be configured for the repository:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          PASSPHRASE: ${{ secrets.PASSPHRASE }}
       -
         name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v2.5.0
+        uses: goreleaser/goreleaser-action@v3.0.0
         with:
           version: latest
           args: release --rm-dist
