@@ -28,15 +28,18 @@ resource "zfs_dataset" "homedir" {
 
 ### Required
 
-- **name** (String) Name of the ZFS dataset.
+- `name` (String) Name of the ZFS dataset.
 
 ### Optional
 
-- **gid** (Number) Set group of the mountpoint. Must be a valid gid
-- **group** (String) Set group of the mountpoint. Must be a valid group name
-- **id** (String) The ID of this resource.
-- **mountpoint** (String) Mountpoint of the dataset.
-- **owner** (String) Set owner of the mountpoint. Must be a valid username
-- **uid** (Number) Set owner of the mountpoint. Must be a valid uid
+- `gid` (Number) Set group of the mountpoint. Must be a valid gid
+- `group` (String) Set group of the mountpoint. Must be a valid group name
+- `mountpoint` (String) Mountpoint of the dataset.
+- `owner` (String) Set owner of the mountpoint. Must be a valid username
+- `uid` (Number) Set owner of the mountpoint. Must be a valid uid
+
+### Read-Only
+
+- `id` (String) The ID of this resource.
 
 

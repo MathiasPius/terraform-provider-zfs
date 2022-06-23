@@ -17,18 +17,15 @@ Data about a specific dataset.
 
 ### Required
 
-- **name** (String) Name of the zfs dataset.
-
-### Optional
-
-- **id** (String) The ID of this resource.
+- `name` (String) Name of the zfs dataset.
 
 ### Read-Only
 
-- **gid** (Number) gid of the group owning the mountpoint.
-- **group** (String) Name of the group owning the mountpoint
-- **mountpoint** (String) Mountpoint of the dataset.
-- **owner** (String) Username of the owner of the mountpoint
-- **uid** (Number) uid of the owner of the mountpoint
+- `gid` (Number) gid of the group owning the mountpoint.
+- `group` (String) Name of the group owning the mountpoint
+- `id` (String) The ID of this resource.
+- `mountpoint` (String) Mountpoint of the dataset.
+- `owner` (String) Username of the owner of the mountpoint
+- `uid` (Number) uid of the owner of the mountpoint
 
 
