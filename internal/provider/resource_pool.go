@@ -33,6 +33,21 @@ var mirrorSchema = &schema.Resource{
 	},
 }
 
+var propertySchema = &schema.Resource{
+	Schema: map[string]*schema.Schema{
+		"name": {
+			Description: "The name of the property to configure",
+			Type:        schema.TypeString,
+			Required:    true,
+		},
+		"value": {
+			Description: "Value of the property",
+			Type:        schema.TypeString,
+			Required:    true,
+		},
+	},
+}
+
 func resourcePool() *schema.Resource {
 	return &schema.Resource{
 		// This description is used by the documentation generator and the language server.
@@ -70,6 +85,20 @@ func resourcePool() *schema.Resource {
 					"mirror",
 				},
 				Elem: vdevSchema,
+			},
+			"property": {
+				Description: "Propert(y/ies) to apply to the zpool",
+				Type:        schema.TypeSet,
+				Optional:    true,
+				Elem:        propertySchema,
+			},
+			"properties": {
+				Description: "All properties for a zpool.",
+				Type:        schema.TypeMap,
+				Computed:    true,
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
+				},
 			},
 		},
 	}
@@ -151,6 +180,15 @@ func resourcePoolRead(ctx context.Context, d *schema.ResourceData, meta interfac
 
 	pool, err := describePool(config, poolName)
 	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	out := make(map[string]interface{})
+	for name, value := range pool.properties {
+		out[name] = value
+	}
+
+	if err := d.Set("properties", out); err != nil {
 		return diag.FromErr(err)
 	}
 

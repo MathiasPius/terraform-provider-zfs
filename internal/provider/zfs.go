@@ -100,9 +100,8 @@ func describeDataset(config *Config, datasetName string) (*Dataset, error) {
 }
 
 type Pool struct {
-	guid     string
-	size     string
-	capacity string
+	guid       string
+	properties map[string]string
 }
 
 func describePool(config *Config, poolname string) (*Pool, error) {
@@ -115,7 +114,13 @@ func describePool(config *Config, poolname string) (*Pool, error) {
 	reader := csv.NewReader(strings.NewReader(stdout))
 	reader.Comma = '\t'
 
-	pool := Pool{}
+	log.Print("[DEBUG] parsing zpool properties")
+
+	pool := Pool{
+		guid:       "",
+		properties: make(map[string]string),
+	}
+
 	for {
 		line, err := reader.Read()
 		if err == io.EOF {
@@ -124,17 +129,14 @@ func describePool(config *Config, poolname string) (*Pool, error) {
 			return nil, err
 		}
 
-		switch line[1] {
-		case "size":
-			pool.size = line[2]
-		case "capacity":
-			pool.capacity = line[2]
-		case "guid":
+		if line[1] == "guid" {
 			pool.guid = line[2]
-		default:
-			// do nothing
 		}
+
+		pool.properties[line[1]] = line[2]
 	}
+
+	log.Printf("[DEBUG] pool definition: %s", pool)
 
 	return &pool, nil
 }

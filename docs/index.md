@@ -29,6 +29,7 @@ provider "zfs" {
 
 ### Optional
 
+- **command_prefix** (String) Can be used to prefix all ssh commands issued on the target host. For example, a command_prefix of 'sudo' can be used to elevate privileges on the target host, assuming password-less is configured for the user
 - **key** (String)
 - **key_passphrase** (String)
 - **key_path** (String)
