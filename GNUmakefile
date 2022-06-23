@@ -1,5 +1,5 @@
 default: testacc
-version = 0.3.0
+version = 0.3.1
 local_path = ~/.terraform.d/plugins/local/MathiasPius/zfs/$(version)/linux_amd64/
 
 # Run acceptance tests
