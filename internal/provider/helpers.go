@@ -14,7 +14,7 @@ import (
 func callSshCommand(config *Config, cmd string, args ...interface{}) (string, error) {
 	cmd = fmt.Sprintf(cmd, args...)
 	log.Printf("[DEBUG] ssh command: %s %s", config.command_prefix, cmd)
-	stdout, stderr, done, err := config.ssh.Run(cmd, 60*time.Second)
+	stdout, stderr, done, err := config.ssh.Run(config.command_prefix+" "+cmd, 60*time.Second)
 
 	if stderr != "" {
 		if strings.Contains(stderr, "dataset does not exist") {
