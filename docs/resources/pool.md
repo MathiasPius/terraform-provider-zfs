@@ -62,8 +62,8 @@ resource "zfs_pool" "zdata" {
 
 ### Optional
 
-- `device` (Block Set) Defines a striped vdev (see [below for nested schema](#nestedblock--device))
-- `mirror` (Block Set) Defines a mirrored vdev (see [below for nested schema](#nestedblock--mirror))
+- `device` (Block List) Defines a striped vdev (see [below for nested schema](#nestedblock--device))
+- `mirror` (Block List) Defines a mirrored vdev (see [below for nested schema](#nestedblock--mirror))
 - `property` (Block Set) Propert(y/ies) to apply to the zpool (see [below for nested schema](#nestedblock--property))
 
 ### Read-Only
@@ -84,7 +84,7 @@ Required:
 
 Required:
 
-- `device` (Block Set, Min: 2) Device(s) which make up the mirror. Repeat the block for multiple devices (see [below for nested schema](#nestedblock--mirror--device))
+- `device` (Block List, Min: 2) Device(s) which make up the mirror. Repeat the block for multiple devices (see [below for nested schema](#nestedblock--mirror--device))
 
 <a id="nestedblock--mirror--device"></a>
 ### Nested Schema for `mirror.device`
