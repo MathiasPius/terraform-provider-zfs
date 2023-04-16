@@ -99,13 +99,27 @@ func describeDataset(config *Config, datasetName string) (*Dataset, error) {
 	return &dataset, nil
 }
 
+type Device struct {
+	path string
+}
+
+type Mirror struct {
+	devices []Device
+}
+
 type Pool struct {
 	guid       string
 	properties map[string]string
+	layout     PoolLayout
 }
 
-func describePool(config *Config, poolname string) (*Pool, error) {
-	stdout, err := callSshCommand(config, "zpool get -H all %s", poolname)
+type PoolLayout struct {
+	mirrors []Mirror
+	striped []Device
+}
+
+func readPoolProperties(config *Config, poolName string) (map[string]string, error) {
+	stdout, err := callSshCommand(config, "zpool get -H all %s", poolName)
 
 	if err != nil {
 		return nil, err
@@ -116,9 +130,49 @@ func describePool(config *Config, poolname string) (*Pool, error) {
 
 	log.Print("[DEBUG] parsing zpool properties")
 
-	pool := Pool{
-		guid:       "",
-		properties: make(map[string]string),
+	properties := make(map[string]string)
+
+	for {
+		line, err := reader.Read()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return nil, err
+		}
+
+		properties[line[1]] = line[2]
+	}
+
+	log.Printf("[DEBUG] %s properties: %s", poolName, properties)
+
+	return properties, nil
+}
+
+func readPoolLayout(config *Config, poolName string) (*PoolLayout, error) {
+	log.Printf("[DEBUG] reading zpool layout for %s", poolName)
+	stdout, err := callSshCommand(config, "zpool list -HPv %s", poolName)
+
+	if err != nil {
+		return nil, err
+	}
+
+	reader := csv.NewReader(strings.NewReader(stdout))
+	reader.Comma = '\t'
+
+	// First line of zpool list output is the pool name/statistics themselves,
+	// so we skip this line, of course making sure that the read itself works.
+	line, err := reader.Read()
+	if err == io.EOF {
+		return nil, &PoolError{errmsg: "failed to read pool layout"}
+	} else if err != nil {
+		return nil, err
+	}
+
+	log.Printf("[DEBUG] parsing zpool layout for %s", line)
+
+	layout := PoolLayout{
+		mirrors: make([]Mirror, 0),
+		striped: make([]Device, 0),
 	}
 
 	for {
@@ -129,16 +183,50 @@ func describePool(config *Config, poolname string) (*Pool, error) {
 			return nil, err
 		}
 
-		if line[1] == "guid" {
-			pool.guid = line[2]
-		}
+		// All vdevs prefixed with "mirror" indicate the start of a mirrored vdev definition.
+		// mirror* is also a reserved name so we know that if it starts with mirror, it is a mirror.
+		// This is further ensured because we use the -P flag (use full path) with the zpool list
+		// command, meaning all devide vdevs should start with a a forward slash.
+		if strings.HasPrefix(line[1], "mirror") {
+			layout.mirrors = append(layout.mirrors, Mirror{
+				devices: make([]Device, 0),
+			})
+		} else {
 
-		pool.properties[line[1]] = line[2]
+			// If no mirror vdev has been instantiated, this is just a plain striped vdev.
+			if len(layout.mirrors) == 0 {
+				layout.striped = append(layout.striped, Device{
+					path: line[1],
+				})
+			} else {
+				// Otherwise, this vdev belongs to the last defined mirror.
+				mirror := &layout.mirrors[len(layout.mirrors)-1]
+				mirror.devices = append(mirror.devices, Device{path: line[1]})
+			}
+		}
 	}
 
-	log.Printf("[DEBUG] pool definition: %s", pool)
+	log.Printf("[DEBUG] pool layout: %s", layout)
 
-	return &pool, nil
+	return &layout, nil
+}
+
+func describePool(config *Config, poolName string) (*Pool, error) {
+	properties, err := readPoolProperties(config, poolName)
+	if err != nil {
+		return nil, err
+	}
+
+	layout, err := readPoolLayout(config, poolName)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Pool{
+		guid:       properties["guid"],
+		properties: properties,
+		layout:     *layout,
+	}, nil
 }
 
 type CreateDataset struct {
@@ -193,11 +281,6 @@ type CreatePool struct {
 
 func createPool(config *Config, pool *CreatePool) (*Pool, error) {
 	options := make(map[string]string)
-	/*
-		if pool.mountpoint != "" {
-			options["mountpoint"] = dataset.mountpoint
-		}
-	*/
 
 	serialized_options := ""
 	for k, v := range options {
@@ -207,7 +290,7 @@ func createPool(config *Config, pool *CreatePool) (*Pool, error) {
 	_, err := callSshCommand(config, "zpool create %s %s %s", serialized_options, pool.name, pool.vdevs)
 
 	if err != nil {
-		// We might have an error, but it's possible that the dataset was still created
+		// We might have an error, but it's possible that the pool was still created
 		fetch_pool, fetcherr := describePool(config, pool.name)
 
 		// This is really dumb, but return both?
@@ -236,4 +319,32 @@ func renamePool(config *Config, oldName string, newName string) error {
 func destroyPool(config *Config, poolName string) error {
 	_, err := callSshCommand(config, "zpool destroy %s", poolName)
 	return err
+}
+
+func flattenProperties(pool Pool) map[string]interface{} {
+	out := make(map[string]interface{})
+	for name, value := range pool.properties {
+		out[name] = value
+	}
+
+	return out
+}
+
+func flattenMirror(mirror Mirror) map[string]interface{} {
+	out := make(map[string]interface{})
+	devices := make([]map[string]interface{}, len(mirror.devices))
+	for device_id, device := range mirror.devices {
+		device := flattenDevice(device)
+		devices[device_id] = device
+	}
+	out["device"] = devices
+
+	return out
+}
+
+func flattenDevice(device Device) map[string]interface{} {
+	out := make(map[string]interface{})
+	out["path"] = device.path
+
+	return out
 }

@@ -7,8 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
 func callSshCommand(config *Config, cmd string, args ...interface{}) (string, error) {
@@ -74,10 +72,10 @@ func getFileOwnership(config *Config, path string) (*Ownership, error) {
 func parseVdevSpecification(mirrors interface{}, devices interface{}) (string, error) {
 	vdevs := ""
 	if mirrors != nil {
-		for _, mirror := range mirrors.(*schema.Set).List() {
+		for _, mirror := range mirrors.([]interface{}) {
 			devices := mirror.(map[string]interface{})["device"]
 			vdevs = vdevs + " mirror"
-			for _, device := range devices.(*schema.Set).List() {
+			for _, device := range devices.([]interface{}) {
 				path := device.(map[string]interface{})["path"].(string)
 				vdevs = vdevs + " " + path
 			}
@@ -85,7 +83,7 @@ func parseVdevSpecification(mirrors interface{}, devices interface{}) (string, e
 	}
 
 	if devices != nil {
-		for _, device := range devices.(*schema.Set).List() {
+		for _, device := range devices.([]interface{}) {
 			path := device.(map[string]interface{})["path"].(string)
 			vdevs = vdevs + " " + path
 		}

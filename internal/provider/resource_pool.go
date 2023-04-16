@@ -24,7 +24,7 @@ var mirrorSchema = &schema.Resource{
 	Schema: map[string]*schema.Schema{
 		"device": {
 			Description: "Device(s) which make up the mirror. Repeat the block for multiple devices",
-			Type:        schema.TypeSet,
+			Type:        schema.TypeList,
 			Required:    true,
 			ForceNew:    true,
 			Elem:        vdevSchema,
@@ -70,13 +70,13 @@ func resourcePool() *schema.Resource {
 			},
 			"mirror": {
 				Description: "Defines a mirrored vdev",
-				Type:        schema.TypeSet,
+				Type:        schema.TypeList,
 				Optional:    true,
 				Elem:        mirrorSchema,
 			},
 			"device": {
 				Description: "Defines a striped vdev",
-				Type:        schema.TypeSet,
+				Type:        schema.TypeList,
 				Optional:    true,
 				AtLeastOneOf: []string{
 					"device", "mirror",
@@ -105,8 +105,6 @@ func resourcePool() *schema.Resource {
 }
 
 func resourcePoolCreate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
-	var diags diag.Diagnostics
-
 	poolName := d.Get("name").(string)
 
 	config := meta.(*Config)
@@ -153,14 +151,11 @@ func resourcePoolCreate(ctx context.Context, d *schema.ResourceData, meta interf
 	// We're setting the ID here because the dataset DOES exist, even if the mountpoint
 	// is not properly configured!
 	log.Printf("[DEBUG] committing guid: %s", pool.guid)
-	d.SetId(pool.guid)
 
-	return diags
+	return populateResourceDataPool(d, *pool)
 }
 
 func resourcePoolRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
-	var diags diag.Diagnostics
-
 	config := meta.(*Config)
 
 	poolName := d.Get("name").(string)
@@ -183,12 +178,31 @@ func resourcePoolRead(ctx context.Context, d *schema.ResourceData, meta interfac
 		return diag.FromErr(err)
 	}
 
-	out := make(map[string]interface{})
-	for name, value := range pool.properties {
-		out[name] = value
+	return populateResourceDataPool(d, *pool)
+}
+
+func populateResourceDataPool(d *schema.ResourceData, pool Pool) diag.Diagnostics {
+	var diags diag.Diagnostics
+
+	devices := make([]map[string]interface{}, len(pool.layout.striped))
+	for device_id, device := range pool.layout.striped {
+		devices[device_id] = flattenDevice(device)
 	}
 
-	if err := d.Set("properties", out); err != nil {
+	mirrors := make([]map[string]interface{}, len(pool.layout.mirrors))
+	for mirror_id, mirror := range pool.layout.mirrors {
+		mirrors[mirror_id] = flattenMirror(mirror)
+	}
+
+	if err := d.Set("device", devices); err != nil {
+		return diag.FromErr(err)
+	}
+
+	if err := d.Set("mirror", mirrors); err != nil {
+		return diag.FromErr(err)
+	}
+
+	if err := d.Set("properties", flattenProperties(pool)); err != nil {
 		return diag.FromErr(err)
 	}
 
