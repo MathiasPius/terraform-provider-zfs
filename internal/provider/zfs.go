@@ -18,9 +18,22 @@ type Dataset struct {
 	mountpoint string
 }
 
-func updateOption(config *Config, datasetName string, option string, value string) (string, error) {
-	log.Printf("[DEBUG] changing zfs option %s for %s to %s", option, datasetName, value)
-	return callSshCommand(config, "zfs set %s=%s %s", option, value, datasetName)
+func updateDatasetOption(config *Config, datasetName string, option string, value string) (string, error) {
+	log.Printf("[DEBUG] changing zfs option %s for %s to '%s'", option, datasetName, value)
+	if value == "" {
+		return callSshCommand(config, "zfs inherit %s %s", option, datasetName)
+	} else {
+		return callSshCommand(config, "zfs set %s=%s %s", option, value, datasetName)
+	}
+}
+
+func updatePoolOption(config *Config, poolName string, option string, value string) (string, error) {
+	log.Printf("[DEBUG] changing zpool option %s for %s to '%s'", option, poolName, value)
+	if value == "" {
+		return callSshCommand(config, "zpool inherit %s %s", option, poolName)
+	} else {
+		return callSshCommand(config, "zpool set %s=%s %s", option, value, poolName)
+	}
 }
 
 func getZfsResourceNameByGuid(config *Config, resource_type string, guid string) (*string, error) {
@@ -275,16 +288,15 @@ func renameDataset(config *Config, oldName string, newName string) error {
 }
 
 type CreatePool struct {
-	name  string
-	vdevs string
+	name       string
+	vdevs      string
+	properties map[string]string
 }
 
 func createPool(config *Config, pool *CreatePool) (*Pool, error) {
-	options := make(map[string]string)
-
 	serialized_options := ""
-	for k, v := range options {
-		serialized_options = fmt.Sprintf(" -o %s=%s", k, v)
+	for property, value := range pool.properties {
+		serialized_options = fmt.Sprintf(" -o %s=%s", property, value)
 	}
 
 	_, err := callSshCommand(config, "zpool create %s %s %s", serialized_options, pool.name, pool.vdevs)

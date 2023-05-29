@@ -139,9 +139,12 @@ func resourcePoolCreate(ctx context.Context, d *schema.ResourceData, meta interf
 		return diag.FromErr(err)
 	}
 
+	properties := parseOptions(d.Get("property").(*schema.Set).List())
+
 	pool, err = createPool(config, &CreatePool{
-		name:  poolName,
-		vdevs: vdev_spec,
+		name:       poolName,
+		vdevs:      vdev_spec,
+		properties: properties,
 	})
 
 	if err != nil {
@@ -218,12 +221,41 @@ func resourcePoolUpdate(ctx context.Context, d *schema.ResourceData, meta interf
 	}
 
 	poolName := d.Get("name").(string)
-	// Rename the dataset
 	if poolName != *old_name {
 		if err := renamePool(config, *old_name, poolName); err != nil {
 			return diag.FromErr(err)
 		}
 	}
+
+	pool, err := describePool(config, poolName)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	old_properties, new_properties := d.GetChange("property")
+
+	// Unset all properties that are no longer defined.
+	removed_properties := parseOptions(old_properties.(*schema.Set).Difference(new_properties.(*schema.Set)).List())
+	for property := range removed_properties {
+		_, err := updatePoolOption(config, poolName, property, "")
+		if err != nil {
+			return diag.FromErr(err)
+		}
+	}
+
+	// Update properties which don't match the desired state.
+	desired_properties := parseOptions(d.Get("property").(*schema.Set).List())
+	log.Printf("[DEBUG] desired properties: %s", desired_properties)
+	log.Printf("[DEBUG] actual properties: %s", pool.properties)
+	for property, value := range desired_properties {
+		if pool.properties[property] != value {
+			_, err := updatePoolOption(config, poolName, property, value)
+			if err != nil {
+				return diag.FromErr(err)
+			}
+		}
+	}
+
 	return resourcePoolRead(ctx, d, meta)
 }
 
