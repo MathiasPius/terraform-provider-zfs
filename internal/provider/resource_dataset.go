@@ -240,7 +240,7 @@ func resourceDatasetUpdate(ctx context.Context, d *schema.ResourceData, meta int
 
 	if mountpoint, ok := d.GetOk("mountpoint"); ok {
 		if d.HasChange("mountpoint") {
-			if _, err := updateOption(config, datasetName, "mountpoint", mountpoint.(string)); err != nil {
+			if _, err := updateDatasetOption(config, datasetName, "mountpoint", mountpoint.(string)); err != nil {
 				return diag.FromErr(err)
 			}
 

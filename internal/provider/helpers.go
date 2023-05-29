@@ -92,3 +92,14 @@ func parseVdevSpecification(mirrors interface{}, devices interface{}) (string, e
 	log.Printf("[DEBUG] vdev specification: %s", vdevs)
 	return vdevs, nil
 }
+
+func parseOptions(options []interface{}) map[string]string {
+	properties := make(map[string]string)
+
+	for _, option := range options {
+		property := option.(map[string]interface{})
+		properties[property["name"].(string)] = property["value"].(string)
+	}
+
+	return properties
+}

@@ -1,5 +1,5 @@
 default: testacc
-version = 0.4.0
+version = 0.5.0
 local_path = ~/.terraform.d/plugins/local/MathiasPius/zfs/$(version)/linux_amd64/
 
 # Run acceptance tests
@@ -10,6 +10,7 @@ testacc:
 .PHONY: build-local
 build-local:
 	mkdir -p $(local_path)
+	rm -r $(local_path)
 	go fmt ./... && go build -o $(local_path)/terraform-provider-zfs
 
 .PHONY: docker-build
