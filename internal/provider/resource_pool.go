@@ -167,7 +167,7 @@ func resourcePoolCreate(ctx context.Context, d *schema.ResourceData, meta interf
 		}
 	}
 
-	vdev_spec, err := parseVdevSpecification(d.Get("mirror"), d.Get("devices"))
+	vdev_spec, err := parseVdevSpecification(d.Get("mirror"), d.Get("device"))
 	if err != nil {
 		log.Printf("[DEBUG] failed to parse vdev specification")
 		return diag.FromErr(err)
