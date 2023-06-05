@@ -64,12 +64,28 @@ resource "zfs_pool" "zdata" {
 
 - `device` (Block List) Defines a striped vdev (see [below for nested schema](#nestedblock--device))
 - `mirror` (Block List) Defines a mirrored vdev (see [below for nested schema](#nestedblock--mirror))
-- `property` (Block Set) Propert(y/ies) to apply to the zpool (see [below for nested schema](#nestedblock--property))
+- `property` (Block Set) Propert(y/ies) to set (see [below for nested schema](#nestedblock--property))
+- `property_mode` (String) Which properties to manage.
+
+		"defined" means only manage the properties explicitly defined in the resource. This is the default.
+
+		"native" means manage all native zfs properties, but leave user properties alone (see man zfsprops for more info
+		about these types of properties). This means all properties that aren't defined in the terraform resource but that
+		are explicitly overriden on the zfs resource will be set back to inherit from their parent/the default.
+
+		"all" is like "native", but also includes user properties. Be careful when removing/altering properties you don't
+		recognize as some tools might use user properties to track information important for that tool to work properly
+		with a given resource.
+
+		Note that some properties don't have a default that they can be compared/reset to (notably most of the zpool
+		properties). These properties will only ever be managed when explicitly defined, and will be left as they are when
+		they stop being defined.
 
 ### Read-Only
 
 - `id` (String) The ID of this resource.
-- `properties` (Map of String) All properties for a zpool.
+- `properties` (Map of String) Formatted versions of all zfs properties.
+- `raw_properties` (Map of String) Parseable versions of all zfs properties.
 
 <a id="nestedblock--device"></a>
 ### Nested Schema for `device`

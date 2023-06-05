@@ -64,6 +64,10 @@ func resourceDataset() *schema.Resource {
 				ConflictsWith: []string{"group"},
 				RequiredWith:  []string{"mountpoint"},
 			},
+			"property":       &propertySchema,
+			"property_mode":  &propertyModeSchema,
+			"properties":     &propertiesSchema,
+			"raw_properties": &rawPropertiesSchema,
 		},
 	}
 }
@@ -71,11 +75,11 @@ func resourceDataset() *schema.Resource {
 func resourceDatasetCreate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	var diags diag.Diagnostics
 
-	datasetName := d.Get("name").(string)
-
 	config := meta.(*Config)
 
-	dataset, err := describeDataset(config, datasetName)
+	datasetName := d.Get("name").(string)
+	dataset, err := describeDataset(config, datasetName, getPropertyNames(d))
+
 	if dataset != nil {
 		log.Printf("[DEBUG] zfs dataset %s already exists!", datasetName)
 	}
@@ -98,9 +102,11 @@ func resourceDatasetCreate(ctx context.Context, d *schema.ResourceData, meta int
 	}
 
 	mountpoint := d.Get("mountpoint").(string)
+	properties := parsePropertyBlocks(d.Get("property").(*schema.Set).List())
 	dataset, err = createDataset(config, &CreateDataset{
 		name:       datasetName,
 		mountpoint: mountpoint,
+		properties: properties,
 	})
 
 	if err != nil {
@@ -161,7 +167,7 @@ func resourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta inter
 		return diag.FromErr(err)
 	}
 
-	dataset, err := describeDataset(config, datasetName)
+	dataset, err := describeDataset(config, datasetName, getPropertyNames(d))
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -219,6 +225,10 @@ func resourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta inter
 		}
 	}
 
+	if err := updatePropertiesInState(d, dataset.properties, []string{"mountpoint"}); err != nil {
+		return diag.FromErr(err)
+	}
+
 	d.SetId(dataset.guid)
 	return diags
 }
@@ -238,56 +248,37 @@ func resourceDatasetUpdate(ctx context.Context, d *schema.ResourceData, meta int
 		}
 	}
 
+	dataset, err := describeDataset(config, datasetName, getPropertyNames(d))
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	overrideProperties := map[string]string{"mountpoint": d.Get("mountpoint").(string)}
+	err = applyPropertyDiff(config, d, datasetName, dataset.properties, overrideProperties)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
 	if mountpoint, ok := d.GetOk("mountpoint"); ok {
-		if d.HasChange("mountpoint") {
-			if _, err := updateDatasetOption(config, datasetName, "mountpoint", mountpoint.(string)); err != nil {
+		if uid, ok := d.GetOk("uid"); ok && d.HasChange("uid") {
+			if _, err = callSshCommand(config, "chown '%d' '%s'", uid.(int), mountpoint.(string)); err != nil {
 				return diag.FromErr(err)
-			}
-
-			if uid, ok := d.GetOk("uid"); ok {
-				if _, err = callSshCommand(config, "chown '%d' '%s'", uid.(int), mountpoint.(string)); err != nil {
-					return diag.FromErr(err)
-				}
-			}
-
-			if gid, ok := d.GetOk("gid"); ok {
-				if _, err = callSshCommand(config, "chgrp '%d' '%s'", gid.(int), mountpoint.(string)); err != nil {
-					return diag.FromErr(err)
-				}
-			}
-
-			if owner, ok := d.GetOk("owner"); ok {
-				if _, err = callSshCommand(config, "chown '%s' '%s'", owner.(string), mountpoint.(string)); err != nil {
-					return diag.FromErr(err)
-				}
-			}
-
-			if group, ok := d.GetOk("group"); ok {
-				if _, err = callSshCommand(config, "chgrp '%s' '%s'", group.(string), mountpoint.(string)); err != nil {
-					return diag.FromErr(err)
-				}
-			}
-		} else {
-			if uid, ok := d.GetOk("uid"); d.HasChange("uid") && ok {
-				if _, err = callSshCommand(config, "chgrp '%d' '%s'", uid.(int), mountpoint.(string)); err != nil {
-					return diag.FromErr(err)
-				}
 			}
 		}
 
-		if gid, ok := d.GetOk("gid"); d.HasChange("gid") && ok {
+		if gid, ok := d.GetOk("gid"); ok && d.HasChange("gid") {
 			if _, err = callSshCommand(config, "chgrp '%d' '%s'", gid.(int), mountpoint.(string)); err != nil {
 				return diag.FromErr(err)
 			}
 		}
 
-		if owner, ok := d.GetOk("owner"); d.HasChange("owner") && ok {
+		if owner, ok := d.GetOk("owner"); ok && d.HasChange("owner") {
 			if _, err = callSshCommand(config, "chown '%s' '%s'", owner.(string), mountpoint.(string)); err != nil {
 				return diag.FromErr(err)
 			}
 		}
 
-		if group, ok := d.GetOk("group"); d.HasChange("group") && ok {
+		if group, ok := d.GetOk("group"); ok && d.HasChange("group") {
 			if _, err = callSshCommand(config, "chgrp '%s' '%s'", group.(string), mountpoint.(string)); err != nil {
 				return diag.FromErr(err)
 			}

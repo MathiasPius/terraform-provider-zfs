@@ -31,6 +31,8 @@ func dataSourcePool() *schema.Resource {
 				Type:        schema.TypeString,
 				Computed:    true,
 			},
+			"properties":     &propertiesSchema,
+			"raw_properties": &rawPropertiesSchema,
 		},
 	}
 }
@@ -44,21 +46,16 @@ func dataSourcePoolRead(ctx context.Context, d *schema.ResourceData, meta interf
 
 	poolName := d.Get("name").(string)
 
-	pool, err := describePool(config, poolName)
+	pool, err := describePool(config, poolName, getPropertyNames(d))
 	if err != nil {
 		return diag.FromErr(err)
 	}
 
-	for name, value := range pool.properties {
-		if name == "guid" {
-			d.SetId(value)
-		} else {
-			if err := d.Set(name, value); err != nil {
-				return diag.FromErr(err)
-			}
-		}
+	if err = updateCalculatedPropertiesInState(d, pool.properties); err != nil {
+		return diag.FromErr(err)
 	}
 
 	d.SetId(pool.guid)
+
 	return diags
 }

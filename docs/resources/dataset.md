@@ -20,6 +20,10 @@ resource "zfs_dataset" "homedir" {
     uid  = 2519
     gid  = 2519
   }
+  property {
+    name  = "quota"
+    value = "8G"
+  }
 }
 ```
 
@@ -36,10 +40,36 @@ resource "zfs_dataset" "homedir" {
 - `group` (String) Set group of the mountpoint. Must be a valid group name
 - `mountpoint` (String) Mountpoint of the dataset.
 - `owner` (String) Set owner of the mountpoint. Must be a valid username
+- `property` (Block Set) Propert(y/ies) to set (see [below for nested schema](#nestedblock--property))
+- `property_mode` (String) Which properties to manage.
+
+		"defined" means only manage the properties explicitly defined in the resource. This is the default.
+
+		"native" means manage all native zfs properties, but leave user properties alone (see man zfsprops for more info
+		about these types of properties). This means all properties that aren't defined in the terraform resource but that
+		are explicitly overriden on the zfs resource will be set back to inherit from their parent/the default.
+
+		"all" is like "native", but also includes user properties. Be careful when removing/altering properties you don't
+		recognize as some tools might use user properties to track information important for that tool to work properly
+		with a given resource.
+
+		Note that some properties don't have a default that they can be compared/reset to (notably most of the zpool
+		properties). These properties will only ever be managed when explicitly defined, and will be left as they are when
+		they stop being defined.
 - `uid` (Number) Set owner of the mountpoint. Must be a valid uid
 
 ### Read-Only
 
 - `id` (String) The ID of this resource.
+- `properties` (Map of String) Formatted versions of all zfs properties.
+- `raw_properties` (Map of String) Parseable versions of all zfs properties.
+
+<a id="nestedblock--property"></a>
+### Nested Schema for `property`
+
+Required:
+
+- `name` (String) The name of the property to configure
+- `value` (String) Value of the property
 
 
