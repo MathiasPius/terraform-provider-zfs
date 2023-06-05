@@ -7,6 +7,7 @@ import (
 	"log"
 	"strings"
 
+	"github.com/alessio/shellescape"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -255,9 +256,9 @@ func getResetCommand(property string) (string, bool) {
 		return "zpool properties cannot be reset back to a default value", false
 	}
 	if strings.Contains(property, "quota@") {
-		return fmt.Sprintf("zfs set %s=none", property), true
+		return fmt.Sprintf("zfs set %s=none", shellescape.Quote(property)), true
 	}
-	return fmt.Sprintf("zfs inherit -S %s", property), true
+	return fmt.Sprintf("zfs inherit -S %s", shellescape.Quote(property)), true
 }
 
 func applyPropertyDiff(
@@ -307,7 +308,7 @@ func applyPropertyDiff(
 			if isPoolProperty(name) {
 				baseCommand = "zpool"
 			}
-			if _, err := callSshCommand(config, "%s set '%s'='%s' %s", baseCommand, name, value, targetName); err != nil {
+			if _, err := callSshCommand(config, "%s set %s=%s %s", baseCommand, shellescape.Quote(name), shellescape.Quote(value), targetName); err != nil {
 				return err
 			}
 		}
@@ -498,7 +499,7 @@ func createDataset(config *Config, dataset *CreateDataset) (*Dataset, error) {
 
 	serialized_options := ""
 	for property, value := range properties {
-		serialized_options += fmt.Sprintf(" -o '%s'='%s'", property, value)
+		serialized_options += fmt.Sprintf(" -o %s=%s", shellescape.Quote(property), shellescape.Quote(value))
 	}
 
 	_, err := callSshCommand(config, "zfs create %s %s", serialized_options, dataset.name)
@@ -539,9 +540,9 @@ func createPool(config *Config, pool *CreatePool) (*Pool, error) {
 	serialized_options := ""
 	for property, value := range pool.properties {
 		if isPoolProperty(property) {
-			serialized_options += fmt.Sprintf(" -o '%s'='%s'", property, value)
+			serialized_options += fmt.Sprintf(" -o %s=%s", shellescape.Quote(property), shellescape.Quote(value))
 		} else {
-			serialized_options += fmt.Sprintf(" -O '%s'='%s'", property, value)
+			serialized_options += fmt.Sprintf(" -O %s=%s", shellescape.Quote(property), shellescape.Quote(value))
 		}
 	}
 
