@@ -23,6 +23,8 @@ Sample data source in the Terraform provider scaffolding.
 
 - `capacity` (String) Capacity of the pool.
 - `id` (String) The ID of this resource.
+- `properties` (Map of String) Formatted versions of all zfs properties.
+- `raw_properties` (Map of String) Parseable versions of all zfs properties.
 - `size` (String) Size of the pool.
 
 

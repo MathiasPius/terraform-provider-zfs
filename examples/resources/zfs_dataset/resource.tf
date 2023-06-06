@@ -5,4 +5,8 @@ resource "zfs_dataset" "homedir" {
     uid  = 2519
     gid  = 2519
   }
+  property {
+    name  = "quota"
+    value = "8G"
+  }
 }

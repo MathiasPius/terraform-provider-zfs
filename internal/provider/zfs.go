@@ -6,7 +6,316 @@ import (
 	"io"
 	"log"
 	"strings"
+
+	"github.com/alessio/shellescape"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
+
+type PropertySource string
+
+const (
+	SourceLocal     PropertySource = "local"
+	SourceDefault   PropertySource = "default"
+	SourceInherited PropertySource = "inherited"
+	SourceTemporary PropertySource = "temporary"
+	SourceReceived  PropertySource = "received"
+	SourceNone      PropertySource = "none"
+)
+
+func parsePropertySource(input string) (PropertySource, error) {
+	// Inherited is actually represented as "inherited from ...", so we only look at the first word.
+	switch parts := strings.SplitN(input, " ", 2); parts[0] {
+	case string(SourceLocal):
+		return SourceLocal, nil
+	case string(SourceDefault):
+		return SourceDefault, nil
+	case string(SourceInherited):
+		return SourceInherited, nil
+	case string(SourceTemporary):
+		return SourceTemporary, nil
+	case string(SourceReceived):
+		return SourceReceived, nil
+	case "-":
+		return SourceNone, nil
+	default:
+		return "", fmt.Errorf("Unrecognized source %s", input)
+	}
+}
+
+var poolProperties = []string{
+	"allocated",
+	"altroot",
+	"ashift",
+	"autoexpand",
+	"autoreplace",
+	"autotrim",
+	"bootfs",
+	"cachefile",
+	"capacity",
+	"checkpoint",
+	"comment",
+	"compatibility",
+	"dedupratio",
+	"delegation",
+	"expandsize",
+	"failmode",
+	"fragmentation",
+	"free",
+	"freeing",
+	"guid",
+	"health",
+	"leaked",
+	"listsnapshots",
+	"load_guid",
+	"multihost",
+	"readonly",
+	"size",
+	"version",
+}
+
+func isPoolProperty(property string) bool {
+	for _, poolProperty := range poolProperties {
+		if property == poolProperty {
+			return true
+		}
+	}
+	if strings.HasPrefix(property, "feature@") {
+		return true
+	}
+	return false
+}
+
+type Property struct {
+	source   PropertySource
+	value    string
+	rawValue string
+}
+
+func readSomeProperties(config *Config, baseCommand string, resourceName string, propertyName string, properties map[string]Property) error {
+	// First read the regular (formatted) values + the sources.
+	stdout, err := callSshCommand(config, "%s get -H -o property,source,value %s %s", baseCommand, propertyName, resourceName)
+	if err != nil {
+		return err
+	}
+
+	reader := csv.NewReader(strings.NewReader(stdout))
+	reader.Comma = '\t'
+	for {
+		line, err := reader.Read()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return err
+		}
+
+		name := line[0]
+		property := Property{}
+		property.value = line[2]
+		if source, err := parsePropertySource(line[1]); err == nil {
+			property.source = source
+		} else {
+			return fmt.Errorf("Error in property %s: %s", name, err)
+		}
+		properties[name] = property
+	}
+
+	// Then read the properties again in -p(arsable) mode to get the raw values.
+	stdout, err = callSshCommand(config, "%s get -Hp -o property,value %s %s", baseCommand, propertyName, resourceName)
+	if err != nil {
+		return err
+	}
+
+	reader = csv.NewReader(strings.NewReader(stdout))
+	reader.Comma = '\t'
+	for {
+		line, err := reader.Read()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return err
+		}
+
+		name := line[0]
+		property, ok := properties[name]
+		if !ok {
+			continue
+		}
+		property.rawValue = line[1]
+		properties[name] = property
+	}
+
+	return nil
+}
+
+func readAllProperties(config *Config, baseCommand string, resourceName string, requiredProperties []string, properties map[string]Property) error {
+	if err := readSomeProperties(config, baseCommand, resourceName, "all", properties); err != nil {
+		return err
+	}
+	// Most properties will have been fetched by querying 'all', but some are only returned when specifically asked for
+	// (e.g. userquota@username), so check if any required properties are missing and fetch them now.
+	missing := make([]string, 0)
+	for _, property := range requiredProperties {
+		if _, ok := properties[property]; !ok {
+			missing = append(missing, property)
+		}
+	}
+	if len(missing) > 0 {
+		if err := readSomeProperties(config, baseCommand, resourceName, strings.Join(requiredProperties, ","), properties); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func readDatasetProperties(config *Config, datasetName string, requiredProperties []string, properties map[string]Property) error {
+	requiredDatasetProperties := make([]string, 0)
+	for _, property := range requiredProperties {
+		if !isPoolProperty(property) {
+			requiredDatasetProperties = append(requiredDatasetProperties, property)
+		}
+	}
+	return readAllProperties(config, "zfs", datasetName, requiredDatasetProperties, properties)
+}
+
+func readPoolProperties(config *Config, poolName string, requiredProperties []string, properties map[string]Property) error {
+	requiredPoolProperties := make([]string, 0)
+	for _, property := range requiredProperties {
+		if isPoolProperty(property) {
+			requiredPoolProperties = append(requiredPoolProperties, property)
+		}
+	}
+	return readAllProperties(config, "zpool", poolName, requiredPoolProperties, properties)
+}
+
+func updateCalculatedPropertiesInState(d *schema.ResourceData, properties map[string]Property) error {
+	if err := d.Set("properties", flattenProperties(properties)); err != nil {
+		return err
+	}
+	return d.Set("raw_properties", flattenRawProperties(properties))
+}
+
+func updatePropertiesInState(d *schema.ResourceData, properties map[string]Property, ignoredProperties []string) error {
+	if err := updateCalculatedPropertiesInState(d, properties); err != nil {
+		return err
+	}
+
+	defined := make(map[string]string)
+	for _, property := range d.Get("property").(*schema.Set).List() {
+		property := property.(map[string]interface{})
+		defined[property["name"].(string)] = property["value"].(string)
+	}
+
+	ignored := make(map[string]bool)
+	for _, name := range ignoredProperties {
+		ignored[name] = true
+	}
+
+	mode := d.Get("property_mode").(string)
+	blocks := make([]interface{}, 0)
+	for name, property := range properties {
+		if ignored[name] {
+			continue
+		}
+		if _, ok := defined[name]; !ok {
+			switch mode {
+			case "defined":
+				continue
+			case "native":
+				if strings.Contains(name, ":") {
+					continue
+				}
+				fallthrough // native is just all with a filter for user properties, so fallthrough now that the filter has been applied.
+			case "all":
+				if !(property.source == SourceLocal || property.source == SourceTemporary) {
+					// Ignore properties that aren't in some way overridden on the resource.
+					continue
+				}
+				if isPoolProperty(name) {
+					// Pool properties cannot be reset to a default value (as there is no `zfs inherit` equivalent for zpool),
+					// so there is no point tracking these unless they are defined in the property (in which case we have a
+					// target value).
+					continue
+				}
+			default:
+				return fmt.Errorf("Invalid value %s for property_mode", mode)
+			}
+		}
+		block := make(map[string]interface{}, 0)
+		block["name"] = name
+		block["value"] = property.value
+		if defined[name] == property.rawValue {
+			block["value"] = property.rawValue
+		}
+		blocks = append(blocks, block)
+	}
+	return d.Set("property", blocks)
+}
+
+func getResetCommand(property string) (string, bool) {
+	if isPoolProperty(property) {
+		return "zpool properties cannot be reset back to a default value", false
+	}
+	if strings.Contains(property, "quota@") {
+		return fmt.Sprintf("zfs set %s=none", shellescape.Quote(property)), true
+	}
+	return fmt.Sprintf("zfs inherit -S %s", shellescape.Quote(property)), true
+}
+
+func applyPropertyDiff(
+	config *Config,
+	d *schema.ResourceData,
+	targetName string,
+	actualProperties map[string]Property,
+	overrideProperties map[string]string,
+) error {
+	oldProperties_, newProperties_ := d.GetChange("property")
+	oldProperties := oldProperties_.(*schema.Set)
+	newProperties := newProperties_.(*schema.Set)
+
+	// Ensure overridden properties haven't been set by the user, and inject them in the list
+	for name, value := range overrideProperties {
+		for _, property := range newProperties.List() {
+			if property.(map[string]interface{})["name"] == name {
+				return fmt.Errorf("Don't set '%s' as a property block, use the dedicated attribute instead.", name)
+			}
+		}
+		property := make(map[string]interface{})
+		property["name"] = name
+		property["value"] = value
+		newProperties.Add(property)
+	}
+
+	// Unset (inherit) all properties that are no longer defined.
+	removedProperties := parsePropertyBlocks(oldProperties.Difference(newProperties).List())
+	log.Printf("[DEBUG] removed properties: %s", removedProperties)
+	for property := range removedProperties {
+		if result, ok := getResetCommand(property); ok {
+			if _, err := callSshCommand(config, "%s %s", result, targetName); err != nil {
+				return err
+			}
+		} else {
+			log.Printf("%s, leaving %s at whatever value it's currently at", result, property)
+		}
+	}
+
+	// Update properties which don't match the desired state.
+	desiredProperties := parsePropertyBlocks(newProperties.List())
+	log.Printf("[DEBUG] desired properties: %s", desiredProperties)
+	log.Printf("[DEBUG] actual properties: %s", actualProperties)
+	for name, value := range desiredProperties {
+		if value != actualProperties[name].value {
+			baseCommand := "zfs"
+			if isPoolProperty(name) {
+				baseCommand = "zpool"
+			}
+			if _, err := callSshCommand(config, "%s set %s=%s %s", baseCommand, shellescape.Quote(name), shellescape.Quote(value), targetName); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
 
 type Dataset struct {
 	guid       string
@@ -16,24 +325,7 @@ type Dataset struct {
 	referenced string
 	mounted    string
 	mountpoint string
-}
-
-func updateDatasetOption(config *Config, datasetName string, option string, value string) (string, error) {
-	log.Printf("[DEBUG] changing zfs option %s for %s to '%s'", option, datasetName, value)
-	if value == "" {
-		return callSshCommand(config, "zfs inherit %s %s", option, datasetName)
-	} else {
-		return callSshCommand(config, "zfs set %s=%s %s", option, value, datasetName)
-	}
-}
-
-func updatePoolOption(config *Config, poolName string, option string, value string) (string, error) {
-	log.Printf("[DEBUG] changing zpool option %s for %s to '%s'", option, poolName, value)
-	if value == "" {
-		return callSshCommand(config, "zpool inherit %s %s", option, poolName)
-	} else {
-		return callSshCommand(config, "zpool set %s=%s %s", option, value, poolName)
-	}
+	properties map[string]Property
 }
 
 func getZfsResourceNameByGuid(config *Config, resource_type string, guid string) (*string, error) {
@@ -70,44 +362,21 @@ func getPoolNameByGuid(config *Config, guid string) (*string, error) {
 	return getZfsResourceNameByGuid(config, "zpool", guid)
 }
 
-func describeDataset(config *Config, datasetName string) (*Dataset, error) {
-	stdout, err := callSshCommand(config, "zfs get -H all %s", datasetName)
-
-	if err != nil {
+func describeDataset(config *Config, datasetName string, requiredProperties []string) (*Dataset, error) {
+	properties := make(map[string]Property, 0)
+	if err := readDatasetProperties(config, datasetName, requiredProperties, properties); err != nil {
 		return nil, err
 	}
 
-	reader := csv.NewReader(strings.NewReader(stdout))
-	reader.Comma = '\t'
-
 	dataset := Dataset{}
-	for {
-		line, err := reader.Read()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			return nil, err
-		}
-
-		switch line[1] {
-		case "creation":
-			dataset.creation = line[2]
-		case "used":
-			dataset.used = line[2]
-		case "available":
-			dataset.available = line[2]
-		case "referenced":
-			dataset.referenced = line[2]
-		case "mounted":
-			dataset.mounted = line[2]
-		case "mountpoint":
-			dataset.mountpoint = line[2]
-		case "guid":
-			dataset.guid = line[2]
-		default:
-			// do nothing
-		}
-	}
+	dataset.properties = properties
+	dataset.creation = properties["creation"].value
+	dataset.used = properties["used"].value
+	dataset.available = properties["available"].value
+	dataset.referenced = properties["referenced"].value
+	dataset.mounted = properties["mounted"].value
+	dataset.mountpoint = properties["mountpoint"].value
+	dataset.guid = properties["guid"].value
 
 	return &dataset, nil
 }
@@ -122,43 +391,13 @@ type Mirror struct {
 
 type Pool struct {
 	guid       string
-	properties map[string]string
+	properties map[string]Property
 	layout     PoolLayout
 }
 
 type PoolLayout struct {
 	mirrors []Mirror
 	striped []Device
-}
-
-func readPoolProperties(config *Config, poolName string) (map[string]string, error) {
-	stdout, err := callSshCommand(config, "zpool get -H all %s", poolName)
-
-	if err != nil {
-		return nil, err
-	}
-
-	reader := csv.NewReader(strings.NewReader(stdout))
-	reader.Comma = '\t'
-
-	log.Print("[DEBUG] parsing zpool properties")
-
-	properties := make(map[string]string)
-
-	for {
-		line, err := reader.Read()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			return nil, err
-		}
-
-		properties[line[1]] = line[2]
-	}
-
-	log.Printf("[DEBUG] %s properties: %s", poolName, properties)
-
-	return properties, nil
 }
 
 func readPoolLayout(config *Config, poolName string) (*PoolLayout, error) {
@@ -224,19 +463,22 @@ func readPoolLayout(config *Config, poolName string) (*PoolLayout, error) {
 	return &layout, nil
 }
 
-func describePool(config *Config, poolName string) (*Pool, error) {
-	properties, err := readPoolProperties(config, poolName)
-	if err != nil {
-		return nil, err
-	}
-
+func describePool(config *Config, poolName string, requiredProperties []string) (*Pool, error) {
 	layout, err := readPoolLayout(config, poolName)
 	if err != nil {
 		return nil, err
 	}
 
+	properties := make(map[string]Property, 0)
+	if err := readDatasetProperties(config, poolName, requiredProperties, properties); err != nil {
+		return nil, err
+	}
+	if err := readPoolProperties(config, poolName, requiredProperties, properties); err != nil {
+		return nil, err
+	}
+
 	return &Pool{
-		guid:       properties["guid"],
+		guid:       properties["guid"].value,
 		properties: properties,
 		layout:     *layout,
 	}, nil
@@ -245,25 +487,26 @@ func describePool(config *Config, poolName string) (*Pool, error) {
 type CreateDataset struct {
 	name       string
 	mountpoint string
+	properties map[string]string
 }
 
 func createDataset(config *Config, dataset *CreateDataset) (*Dataset, error) {
+	properties := dataset.properties
 
-	options := make(map[string]string)
 	if dataset.mountpoint != "" {
-		options["mountpoint"] = dataset.mountpoint
+		properties["mountpoint"] = dataset.mountpoint
 	}
 
 	serialized_options := ""
-	for k, v := range options {
-		serialized_options = fmt.Sprintf(" -o %s=%s", k, v)
+	for property, value := range properties {
+		serialized_options += fmt.Sprintf(" -o %s=%s", shellescape.Quote(property), shellescape.Quote(value))
 	}
 
 	_, err := callSshCommand(config, "zfs create %s %s", serialized_options, dataset.name)
 
 	if err != nil {
 		// We might have an error, but it's possible that the dataset was still created
-		fetch_dataset, fetcherr := describeDataset(config, dataset.name)
+		fetch_dataset, fetcherr := describeDataset(config, dataset.name, mapKeys(properties))
 
 		// This is really dumb, but return both?
 		if fetcherr != nil {
@@ -273,7 +516,7 @@ func createDataset(config *Config, dataset *CreateDataset) (*Dataset, error) {
 		return nil, err
 	}
 
-	fetch_dataset, fetcherr := describeDataset(config, dataset.name)
+	fetch_dataset, fetcherr := describeDataset(config, dataset.name, mapKeys(properties))
 	return fetch_dataset, fetcherr
 }
 
@@ -296,14 +539,18 @@ type CreatePool struct {
 func createPool(config *Config, pool *CreatePool) (*Pool, error) {
 	serialized_options := ""
 	for property, value := range pool.properties {
-		serialized_options = fmt.Sprintf(" -o %s=%s", property, value)
+		if isPoolProperty(property) {
+			serialized_options += fmt.Sprintf(" -o %s=%s", shellescape.Quote(property), shellescape.Quote(value))
+		} else {
+			serialized_options += fmt.Sprintf(" -O %s=%s", shellescape.Quote(property), shellescape.Quote(value))
+		}
 	}
 
 	_, err := callSshCommand(config, "zpool create %s %s %s", serialized_options, pool.name, pool.vdevs)
 
 	if err != nil {
 		// We might have an error, but it's possible that the pool was still created
-		fetch_pool, fetcherr := describePool(config, pool.name)
+		fetch_pool, fetcherr := describePool(config, pool.name, mapKeys(pool.properties))
 
 		// This is really dumb, but return both?
 		if fetcherr != nil {
@@ -313,7 +560,7 @@ func createPool(config *Config, pool *CreatePool) (*Pool, error) {
 		return nil, err
 	}
 
-	fetch_pool, fetcherr := describePool(config, pool.name)
+	fetch_pool, fetcherr := describePool(config, pool.name, mapKeys(pool.properties))
 	return fetch_pool, fetcherr
 }
 
@@ -333,10 +580,21 @@ func destroyPool(config *Config, poolName string) error {
 	return err
 }
 
-func flattenProperties(pool Pool) map[string]interface{} {
+func flattenProperties(properties map[string]Property) map[string]interface{} {
 	out := make(map[string]interface{})
-	for name, value := range pool.properties {
-		out[name] = value
+	for name, property := range properties {
+		out[name] = make(map[string]interface{})
+		out[name] = property.value
+	}
+
+	return out
+}
+
+func flattenRawProperties(properties map[string]Property) map[string]interface{} {
+	out := make(map[string]interface{})
+	for name, property := range properties {
+		out[name] = make(map[string]interface{})
+		out[name] = property.rawValue
 	}
 
 	return out

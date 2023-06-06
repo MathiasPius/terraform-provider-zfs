@@ -26,6 +26,8 @@ Data about a specific dataset.
 - `id` (String) The ID of this resource.
 - `mountpoint` (String) Mountpoint of the dataset.
 - `owner` (String) Username of the owner of the mountpoint
+- `properties` (Map of String) Formatted versions of all zfs properties.
+- `raw_properties` (Map of String) Parseable versions of all zfs properties.
 - `uid` (Number) uid of the owner of the mountpoint
 
 

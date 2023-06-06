@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
 func callSshCommand(config *Config, cmd string, args ...interface{}) (string, error) {
@@ -93,7 +95,7 @@ func parseVdevSpecification(mirrors interface{}, devices interface{}) (string, e
 	return vdevs, nil
 }
 
-func parseOptions(options []interface{}) map[string]string {
+func parsePropertyBlocks(options []interface{}) map[string]string {
 	properties := make(map[string]string)
 
 	for _, option := range options {
@@ -102,4 +104,20 @@ func parseOptions(options []interface{}) map[string]string {
 	}
 
 	return properties
+}
+
+func mapKeys[T interface{}](value map[string]T) []string {
+	keys := make([]string, 0)
+	for key, _ := range value {
+		keys = append(keys, key)
+	}
+	return keys
+}
+
+func getPropertyNames(d *schema.ResourceData) []string {
+	names := make([]string, 0)
+	for _, property := range d.Get("property").(*schema.Set).List() {
+		names = append(names, property.(map[string]interface{})["name"].(string))
+	}
+	return names
 }

@@ -47,6 +47,8 @@ func dataSourceDataset() *schema.Resource {
 				Type:        schema.TypeInt,
 				Computed:    true,
 			},
+			"properties":     &propertiesSchema,
+			"raw_properties": &rawPropertiesSchema,
 		},
 	}
 }
@@ -57,7 +59,7 @@ func dataSourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta int
 	config := meta.(*Config)
 
 	datasetName := d.Get("name").(string)
-	dataset, err := describeDataset(config, datasetName)
+	dataset, err := describeDataset(config, datasetName, getPropertyNames(d))
 
 	if dataset == nil {
 		log.Println("[DEBUG] zfs dataset does not exist!")
@@ -107,6 +109,10 @@ func dataSourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta int
 		if err = d.Set("mountpoint", dataset.mountpoint); err != nil {
 			return diag.FromErr(err)
 		}
+	}
+
+	if err = updateCalculatedPropertiesInState(d, dataset.properties); err != nil {
+		return diag.FromErr(err)
 	}
 
 	return diags

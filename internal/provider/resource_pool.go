@@ -7,6 +7,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 var vdevSchema = &schema.Resource{
@@ -33,19 +34,62 @@ var mirrorSchema = &schema.Resource{
 	},
 }
 
-var propertySchema = &schema.Resource{
-	Schema: map[string]*schema.Schema{
-		"name": {
-			Description: "The name of the property to configure",
-			Type:        schema.TypeString,
-			Required:    true,
-		},
-		"value": {
-			Description: "Value of the property",
-			Type:        schema.TypeString,
-			Required:    true,
+var propertySchema = schema.Schema{
+	Description: "Propert(y/ies) to set",
+	Type:        schema.TypeSet,
+	Optional:    true,
+	Elem: &schema.Resource{
+		Schema: map[string]*schema.Schema{
+			"name": {
+				Description: "The name of the property to configure",
+				Type:        schema.TypeString,
+				Required:    true,
+			},
+			"value": {
+				Description: "Value of the property",
+				Type:        schema.TypeString,
+				Required:    true,
+			},
 		},
 	},
+}
+
+var propertyModeSchema = schema.Schema{
+	Description: `
+		Which properties to manage.
+
+		"defined" means only manage the properties explicitly defined in the resource. This is the default.
+
+		"native" means manage all native zfs properties, but leave user properties alone (see man zfsprops for more info
+		about these types of properties). This means all properties that aren't defined in the terraform resource but that
+		are explicitly overriden on the zfs resource will be set back to inherit from their parent/the default.
+
+		"all" is like "native", but also includes user properties. Be careful when removing/altering properties you don't
+		recognize as some tools might use user properties to track information important for that tool to work properly
+		with a given resource.
+
+		Note that some properties don't have a default that they can be compared/reset to (notably most of the zpool
+		properties). These properties will only ever be managed when explicitly defined, and will be left as they are when
+		they stop being defined.
+	`,
+	Type:             schema.TypeString,
+	Default:          "defined",
+	Optional:         true,
+	ValidateDiagFunc: validation.ToDiagFunc(validation.StringInSlice([]string{"defined", "native", "all"}, false)),
+}
+
+var propertiesSchema = schema.Schema{
+	Description: "Formatted versions of all zfs properties.",
+	Type:        schema.TypeMap,
+	Computed:    true,
+	Elem:        schema.TypeString,
+}
+
+var rawPropertiesSchema = schema.Schema{
+	Description: "Parseable versions of all zfs properties.",
+	Type:        schema.TypeMap,
+	Computed:    true,
+	Elem:        schema.TypeString,
 }
 
 func resourcePool() *schema.Resource {
@@ -86,20 +130,10 @@ func resourcePool() *schema.Resource {
 				},
 				Elem: vdevSchema,
 			},
-			"property": {
-				Description: "Propert(y/ies) to apply to the zpool",
-				Type:        schema.TypeSet,
-				Optional:    true,
-				Elem:        propertySchema,
-			},
-			"properties": {
-				Description: "All properties for a zpool.",
-				Type:        schema.TypeMap,
-				Computed:    true,
-				Elem: &schema.Schema{
-					Type: schema.TypeString,
-				},
-			},
+			"property":       &propertySchema,
+			"property_mode":  &propertyModeSchema,
+			"properties":     &propertiesSchema,
+			"raw_properties": &rawPropertiesSchema,
 		},
 	}
 }
@@ -109,7 +143,7 @@ func resourcePoolCreate(ctx context.Context, d *schema.ResourceData, meta interf
 
 	config := meta.(*Config)
 
-	pool, err := describePool(config, poolName)
+	pool, err := describePool(config, poolName, getPropertyNames(d))
 	if pool != nil {
 		log.Printf("[DEBUG] zpool %s already exists!", poolName)
 	}
@@ -133,13 +167,13 @@ func resourcePoolCreate(ctx context.Context, d *schema.ResourceData, meta interf
 		}
 	}
 
-	vdev_spec, err := parseVdevSpecification(d.Get("mirror"), d.Get("devices"))
+	vdev_spec, err := parseVdevSpecification(d.Get("mirror"), d.Get("device"))
 	if err != nil {
 		log.Printf("[DEBUG] failed to parse vdev specification")
 		return diag.FromErr(err)
 	}
 
-	properties := parseOptions(d.Get("property").(*schema.Set).List())
+	properties := parsePropertyBlocks(d.Get("property").(*schema.Set).List())
 
 	pool, err = createPool(config, &CreatePool{
 		name:       poolName,
@@ -154,6 +188,7 @@ func resourcePoolCreate(ctx context.Context, d *schema.ResourceData, meta interf
 	// We're setting the ID here because the dataset DOES exist, even if the mountpoint
 	// is not properly configured!
 	log.Printf("[DEBUG] committing guid: %s", pool.guid)
+	d.SetId(pool.guid)
 
 	return populateResourceDataPool(d, *pool)
 }
@@ -176,7 +211,7 @@ func resourcePoolRead(ctx context.Context, d *schema.ResourceData, meta interfac
 		diag.FromErr(err)
 	}
 
-	pool, err := describePool(config, poolName)
+	pool, err := describePool(config, poolName, getPropertyNames(d))
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -205,7 +240,7 @@ func populateResourceDataPool(d *schema.ResourceData, pool Pool) diag.Diagnostic
 		return diag.FromErr(err)
 	}
 
-	if err := d.Set("properties", flattenProperties(pool)); err != nil {
+	if err := updatePropertiesInState(d, pool.properties, []string{}); err != nil {
 		return diag.FromErr(err)
 	}
 
@@ -227,33 +262,14 @@ func resourcePoolUpdate(ctx context.Context, d *schema.ResourceData, meta interf
 		}
 	}
 
-	pool, err := describePool(config, poolName)
+	pool, err := describePool(config, poolName, getPropertyNames(d))
 	if err != nil {
 		return diag.FromErr(err)
 	}
 
-	old_properties, new_properties := d.GetChange("property")
-
-	// Unset all properties that are no longer defined.
-	removed_properties := parseOptions(old_properties.(*schema.Set).Difference(new_properties.(*schema.Set)).List())
-	for property := range removed_properties {
-		_, err := updatePoolOption(config, poolName, property, "")
-		if err != nil {
-			return diag.FromErr(err)
-		}
-	}
-
-	// Update properties which don't match the desired state.
-	desired_properties := parseOptions(d.Get("property").(*schema.Set).List())
-	log.Printf("[DEBUG] desired properties: %s", desired_properties)
-	log.Printf("[DEBUG] actual properties: %s", pool.properties)
-	for property, value := range desired_properties {
-		if pool.properties[property] != value {
-			_, err := updatePoolOption(config, poolName, property, value)
-			if err != nil {
-				return diag.FromErr(err)
-			}
-		}
+	err = applyPropertyDiff(config, d, poolName, pool.properties, make(map[string]string))
+	if err != nil {
+		return diag.FromErr(err)
 	}
 
 	return resourcePoolRead(ctx, d, meta)
