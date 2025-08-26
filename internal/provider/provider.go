@@ -78,12 +78,12 @@ func New(version string) func() *schema.Provider {
 				},
 			},
 			DataSourcesMap: map[string]*schema.Resource{
-				"zfs_pool":    dataSourcePool(),
-				"zfs_dataset": dataSourceDataset(),
+				"zfs_pool":       dataSourcePool(),
+				"zfs_filesystem": dataSourceFilesystem(),
 			},
 			ResourcesMap: map[string]*schema.Resource{
-				"zfs_dataset": resourceDataset(),
-				"zfs_pool":    resourcePool(),
+				"zfs_filesystem": resourceFilesystem(),
+				"zfs_pool":       resourcePool(),
 			},
 		}
 

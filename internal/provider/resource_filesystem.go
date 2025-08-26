@@ -9,15 +9,15 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
-func resourceDataset() *schema.Resource {
+func resourceFilesystem() *schema.Resource {
 	return &schema.Resource{
 		// This description is used by the documentation generator and the language server.
-		Description: "zfs dataset resource.",
+		Description: "zfs filesystem resource.",
 
-		CreateContext: resourceDatasetCreate,
-		ReadContext:   resourceDatasetRead,
-		UpdateContext: resourceDatasetUpdate,
-		DeleteContext: resourceDatasetDelete,
+		CreateContext: resourceFilesystemCreate,
+		ReadContext:   resourceFilesystemRead,
+		UpdateContext: resourceFilesystemUpdate,
+		DeleteContext: resourceFilesystemDelete,
 
 		Importer: &schema.ResourceImporter{
 			StateContext: schema.ImportStatePassthroughContext,
@@ -26,12 +26,12 @@ func resourceDataset() *schema.Resource {
 		Schema: map[string]*schema.Schema{
 			"name": {
 				// This description is used by the documentation generator and the language server.
-				Description: "Name of the ZFS dataset.",
+				Description: "Name of the ZFS filesystem.",
 				Type:        schema.TypeString,
 				Required:    true,
 			},
 			"mountpoint": {
-				Description: "Mountpoint of the dataset.",
+				Description: "Mountpoint of the filesystem.",
 				Type:        schema.TypeString,
 				Optional:    true,
 				Default:     "none",
@@ -72,16 +72,16 @@ func resourceDataset() *schema.Resource {
 	}
 }
 
-func resourceDatasetCreate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+func resourceFilesystemCreate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	var diags diag.Diagnostics
 
 	config := meta.(*Config)
 
-	datasetName := d.Get("name").(string)
-	dataset, err := describeDataset(config, datasetName, getPropertyNames(d))
+	filesystemName := d.Get("name").(string)
+	filesystem, err := describeDataset(config, filesystemName, getPropertyNames(d))
 
-	if dataset != nil {
-		log.Printf("[DEBUG] zfs dataset %s already exists!", datasetName)
+	if filesystem != nil {
+		log.Printf("[DEBUG] zfs filesystem %s already exists!", filesystemName)
 	}
 
 	if err != nil {
@@ -103,8 +103,8 @@ func resourceDatasetCreate(ctx context.Context, d *schema.ResourceData, meta int
 
 	mountpoint := d.Get("mountpoint").(string)
 	properties := parsePropertyBlocks(d.Get("property").(*schema.Set).List())
-	dataset, err = createDataset(config, &CreateDataset{
-		name:       datasetName,
+	filesystem, err = createDataset(config, &CreateDataset{
+		name:       filesystemName,
 		mountpoint: mountpoint,
 		properties: properties,
 	})
@@ -113,10 +113,10 @@ func resourceDatasetCreate(ctx context.Context, d *schema.ResourceData, meta int
 		return diag.FromErr(err)
 	}
 
-	// We're setting the ID here because the dataset DOES exist, even if the mountpoint
+	// We're setting the ID here because the filesystem DOES exist, even if the mountpoint
 	// is not properly configured!
-	log.Printf("[DEBUG] committing guid: %s", dataset.guid)
-	d.SetId(dataset.guid)
+	log.Printf("[DEBUG] committing guid: %s", filesystem.guid)
+	d.SetId(filesystem.guid)
 
 	if mountpoint != "none" && mountpoint != "legacy" {
 		if uid, ok := d.GetOk("uid"); ok {
@@ -147,38 +147,38 @@ func resourceDatasetCreate(ctx context.Context, d *schema.ResourceData, meta int
 	return diags
 }
 
-func resourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+func resourceFilesystemRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	var diags diag.Diagnostics
 
 	config := meta.(*Config)
 
-	datasetName := d.Get("name").(string)
+	filesystemName := d.Get("name").(string)
 	if id := d.Id(); id != "" {
 		// If we have a Resource ID, then use that to lookup the real name
 		// of the zfs resource, in case the name has changed.
 		real_name, err := getDatasetNameByGuid(config, id)
 		if err != nil {
-			return diag.FromErr(fmt.Errorf("the dataset %s identified by guid %s could not be found. It was likely deleted on the server outside of terraform", datasetName, id))
+			return diag.FromErr(fmt.Errorf("the filesystem %s identified by guid %s could not be found. It was likely deleted on the server outside of terraform", filesystemName, id))
 		}
-		datasetName = *real_name
+		filesystemName = *real_name
 	}
 
-	if err := d.Set("name", datasetName); err != nil {
+	if err := d.Set("name", filesystemName); err != nil {
 		return diag.FromErr(err)
 	}
 
-	dataset, err := describeDataset(config, datasetName, getPropertyNames(d))
+	filesystem, err := describeDataset(config, filesystemName, getPropertyNames(d))
 	if err != nil {
 		return diag.FromErr(err)
 	}
 
-	if err = d.Set("mountpoint", dataset.mountpoint); err != nil {
+	if err = d.Set("mountpoint", filesystem.mountpoint); err != nil {
 		return diag.FromErr(err)
 	}
 
-	if dataset.mountpoint != "none" && dataset.mountpoint != "legacy" {
-		log.Println("[DEBUG] Fetching dataset mountpoint ownership information")
-		ownership, err := getFileOwnership(config, dataset.mountpoint)
+	if filesystem.mountpoint != "none" && filesystem.mountpoint != "legacy" {
+		log.Println("[DEBUG] Fetching filesystem mountpoint ownership information")
+		ownership, err := getFileOwnership(config, filesystem.mountpoint)
 		if err != nil {
 			return diag.FromErr(err)
 		}
@@ -225,36 +225,36 @@ func resourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta inter
 		}
 	}
 
-	if err := updatePropertiesInState(d, dataset.properties, []string{"mountpoint"}); err != nil {
+	if err := updatePropertiesInState(d, filesystem.properties, []string{"mountpoint"}); err != nil {
 		return diag.FromErr(err)
 	}
 
-	d.SetId(dataset.guid)
+	d.SetId(filesystem.guid)
 	return diags
 }
 
-func resourceDatasetUpdate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+func resourceFilesystemUpdate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	config := meta.(*Config)
 	old_name, err := getDatasetNameByGuid(config, d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
 
-	datasetName := d.Get("name").(string)
-	// Rename the dataset
-	if datasetName != *old_name {
-		if err := renameDataset(config, *old_name, datasetName); err != nil {
+	filesystemName := d.Get("name").(string)
+	// Rename the filesystem
+	if filesystemName != *old_name {
+		if err := renameDataset(config, *old_name, filesystemName); err != nil {
 			return diag.FromErr(err)
 		}
 	}
 
-	dataset, err := describeDataset(config, datasetName, getPropertyNames(d))
+	filesystem, err := describeDataset(config, filesystemName, getPropertyNames(d))
 	if err != nil {
 		return diag.FromErr(err)
 	}
 
 	overrideProperties := map[string]string{"mountpoint": d.Get("mountpoint").(string)}
-	err = applyPropertyDiff(config, d, datasetName, dataset.properties, overrideProperties)
+	err = applyPropertyDiff(config, d, filesystemName, filesystem.properties, overrideProperties)
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -285,15 +285,15 @@ func resourceDatasetUpdate(ctx context.Context, d *schema.ResourceData, meta int
 		}
 	}
 
-	return resourceDatasetRead(ctx, d, meta)
+	return resourceFilesystemRead(ctx, d, meta)
 }
 
-func resourceDatasetDelete(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+func resourceFilesystemDelete(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	var diags diag.Diagnostics
 	config := meta.(*Config)
-	datasetName := d.Get("name").(string)
+	filesystemName := d.Get("name").(string)
 
-	if err := destroyDataset(config, datasetName); err != nil {
+	if err := destroyDataset(config, filesystemName); err != nil {
 		return diag.FromErr(err)
 	}
 
