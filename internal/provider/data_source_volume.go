@@ -22,29 +22,9 @@ func dataSourceVolume() *schema.Resource {
 				Type:        schema.TypeString,
 				Required:    true,
 			},
-			"mountpoint": {
-				Description: "Mountpoint of the volume.",
+			"volsize": {
+				Description: "Size of the volume.",
 				Type:        schema.TypeString,
-				Computed:    true,
-			},
-			"owner": {
-				Description: "Username of the owner of the mountpoint",
-				Type:        schema.TypeString,
-				Computed:    true,
-			},
-			"uid": {
-				Description: "uid of the owner of the mountpoint",
-				Type:        schema.TypeInt,
-				Computed:    true,
-			},
-			"group": {
-				Description: "Name of the group owning the mountpoint",
-				Type:        schema.TypeString,
-				Computed:    true,
-			},
-			"gid": {
-				Description: "gid of the group owning the mountpoint.",
-				Type:        schema.TypeInt,
 				Computed:    true,
 			},
 			"properties":     &propertiesSchema,
@@ -83,33 +63,6 @@ func dataSourceVolumeRead(ctx context.Context, d *schema.ResourceData, meta inte
 	}
 
 	d.SetId(volume.guid)
-
-	if volume.mountpoint != "" && volume.mountpoint != "none" && volume.mountpoint != "legacy" {
-		owner, err := getFileOwnership(config, volume.mountpoint)
-		if err != nil {
-			return diag.FromErr(err)
-		}
-
-		if err := d.Set("owner", owner.userName); err != nil {
-			return diag.FromErr(err)
-		}
-
-		if err = d.Set("group", owner.groupName); err != nil {
-			return diag.FromErr(err)
-		}
-
-		if err = d.Set("uid", owner.uid); err != nil {
-			return diag.FromErr(err)
-		}
-
-		if err = d.Set("gid", owner.gid); err != nil {
-			return diag.FromErr(err)
-		}
-
-		if err = d.Set("mountpoint", volume.mountpoint); err != nil {
-			return diag.FromErr(err)
-		}
-	}
 
 	if err = updateCalculatedPropertiesInState(d, volume.properties); err != nil {
 		return diag.FromErr(err)
