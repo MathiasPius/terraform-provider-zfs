@@ -9,15 +9,15 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
-func resourceFilesystem() *schema.Resource {
+func resourceVolume() *schema.Resource {
 	return &schema.Resource{
 		// This description is used by the documentation generator and the language server.
-		Description: "zfs filesystem resource.",
+		Description: "zfs volume resource.",
 
-		CreateContext: resourceFilesystemCreate,
-		ReadContext:   resourceFilesystemRead,
-		UpdateContext: resourceFilesystemUpdate,
-		DeleteContext: resourceFilesystemDelete,
+		CreateContext: resourceVolumeCreate,
+		ReadContext:   resourceVolumeRead,
+		UpdateContext: resourceVolumeUpdate,
+		DeleteContext: resourceVolumeDelete,
 
 		Importer: &schema.ResourceImporter{
 			StateContext: schema.ImportStatePassthroughContext,
@@ -26,12 +26,12 @@ func resourceFilesystem() *schema.Resource {
 		Schema: map[string]*schema.Schema{
 			"name": {
 				// This description is used by the documentation generator and the language server.
-				Description: "Name of the ZFS filesystem.",
+				Description: "Name of the ZFS volume.",
 				Type:        schema.TypeString,
 				Required:    true,
 			},
 			"mountpoint": {
-				Description: "Mountpoint of the filesystem.",
+				Description: "Mountpoint of the volume.",
 				Type:        schema.TypeString,
 				Optional:    true,
 				Default:     "none",
@@ -72,16 +72,16 @@ func resourceFilesystem() *schema.Resource {
 	}
 }
 
-func resourceFilesystemCreate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+func resourceVolumeCreate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	var diags diag.Diagnostics
 
 	config := meta.(*Config)
 
-	filesystemName := d.Get("name").(string)
-	filesystem, err := describeDataset(config, filesystemName, getPropertyNames(d))
+	volumeName := d.Get("name").(string)
+	volume, err := describeDataset(config, volumeName, getPropertyNames(d))
 
-	if filesystem != nil {
-		log.Printf("[DEBUG] zfs filesystem %s already exists!", filesystemName)
+	if volume != nil {
+		log.Printf("[DEBUG] zfs volume %s already exists!", volumeName)
 	}
 
 	if err != nil {
@@ -103,8 +103,8 @@ func resourceFilesystemCreate(ctx context.Context, d *schema.ResourceData, meta 
 
 	mountpoint := d.Get("mountpoint").(string)
 	properties := parsePropertyBlocks(d.Get("property").(*schema.Set).List())
-	filesystem, err = createDataset(config, &CreateDataset{
-		name:       filesystemName,
+	volume, err = createDataset(config, &CreateDataset{
+		name:       volumeName,
 		mountpoint: mountpoint,
 		properties: properties,
 	})
@@ -113,10 +113,10 @@ func resourceFilesystemCreate(ctx context.Context, d *schema.ResourceData, meta 
 		return diag.FromErr(err)
 	}
 
-	// We're setting the ID here because the filesystem DOES exist, even if the mountpoint
+	// We're setting the ID here because the volume DOES exist, even if the mountpoint
 	// is not properly configured!
-	log.Printf("[DEBUG] committing guid: %s", filesystem.guid)
-	d.SetId(filesystem.guid)
+	log.Printf("[DEBUG] committing guid: %s", volume.guid)
+	d.SetId(volume.guid)
 
 	if mountpoint != "none" && mountpoint != "legacy" {
 		if uid, ok := d.GetOk("uid"); ok {
@@ -147,38 +147,38 @@ func resourceFilesystemCreate(ctx context.Context, d *schema.ResourceData, meta 
 	return diags
 }
 
-func resourceFilesystemRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+func resourceVolumeRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	var diags diag.Diagnostics
 
 	config := meta.(*Config)
 
-	filesystemName := d.Get("name").(string)
+	volumeName := d.Get("name").(string)
 	if id := d.Id(); id != "" {
 		// If we have a Resource ID, then use that to lookup the real name
 		// of the zfs resource, in case the name has changed.
 		real_name, err := getDatasetNameByGuid(config, id)
 		if err != nil {
-			return diag.FromErr(fmt.Errorf("the filesystem %s identified by guid %s could not be found. It was likely deleted on the server outside of terraform", filesystemName, id))
+			return diag.FromErr(fmt.Errorf("the volume %s identified by guid %s could not be found. It was likely deleted on the server outside of terraform", volumeName, id))
 		}
-		filesystemName = *real_name
+		volumeName = *real_name
 	}
 
-	if err := d.Set("name", filesystemName); err != nil {
+	if err := d.Set("name", volumeName); err != nil {
 		return diag.FromErr(err)
 	}
 
-	filesystem, err := describeDataset(config, filesystemName, getPropertyNames(d))
+	volume, err := describeDataset(config, volumeName, getPropertyNames(d))
 	if err != nil {
 		return diag.FromErr(err)
 	}
 
-	if err = d.Set("mountpoint", filesystem.mountpoint); err != nil {
+	if err = d.Set("mountpoint", volume.mountpoint); err != nil {
 		return diag.FromErr(err)
 	}
 
-	if filesystem.mountpoint != "none" && filesystem.mountpoint != "legacy" {
-		log.Println("[DEBUG] Fetching filesystem mountpoint ownership information")
-		ownership, err := getFileOwnership(config, filesystem.mountpoint)
+	if volume.mountpoint != "none" && volume.mountpoint != "legacy" {
+		log.Println("[DEBUG] Fetching volume mountpoint ownership information")
+		ownership, err := getFileOwnership(config, volume.mountpoint)
 		if err != nil {
 			return diag.FromErr(err)
 		}
@@ -225,36 +225,36 @@ func resourceFilesystemRead(ctx context.Context, d *schema.ResourceData, meta in
 		}
 	}
 
-	if err := updatePropertiesInState(d, filesystem.properties, []string{"mountpoint"}); err != nil {
+	if err := updatePropertiesInState(d, volume.properties, []string{"mountpoint"}); err != nil {
 		return diag.FromErr(err)
 	}
 
-	d.SetId(filesystem.guid)
+	d.SetId(volume.guid)
 	return diags
 }
 
-func resourceFilesystemUpdate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+func resourceVolumeUpdate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	config := meta.(*Config)
 	old_name, err := getDatasetNameByGuid(config, d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
 
-	filesystemName := d.Get("name").(string)
-	// Rename the filesystem
-	if filesystemName != *old_name {
-		if err := renameDataset(config, *old_name, filesystemName); err != nil {
+	volumeName := d.Get("name").(string)
+	// Rename the volume
+	if volumeName != *old_name {
+		if err := renameDataset(config, *old_name, volumeName); err != nil {
 			return diag.FromErr(err)
 		}
 	}
 
-	filesystem, err := describeDataset(config, filesystemName, getPropertyNames(d))
+	volume, err := describeDataset(config, volumeName, getPropertyNames(d))
 	if err != nil {
 		return diag.FromErr(err)
 	}
 
 	overrideProperties := map[string]string{"mountpoint": d.Get("mountpoint").(string)}
-	err = applyPropertyDiff(config, d, filesystemName, filesystem.properties, overrideProperties)
+	err = applyPropertyDiff(config, d, volumeName, volume.properties, overrideProperties)
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -285,15 +285,15 @@ func resourceFilesystemUpdate(ctx context.Context, d *schema.ResourceData, meta 
 		}
 	}
 
-	return resourceFilesystemRead(ctx, d, meta)
+	return resourceVolumeRead(ctx, d, meta)
 }
 
-func resourceFilesystemDelete(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+func resourceVolumeDelete(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	var diags diag.Diagnostics
 	config := meta.(*Config)
-	filesystemName := d.Get("name").(string)
+	volumeName := d.Get("name").(string)
 
-	if err := destroyDataset(config, filesystemName); err != nil {
+	if err := destroyDataset(config, volumeName); err != nil {
 		return diag.FromErr(err)
 	}
 
