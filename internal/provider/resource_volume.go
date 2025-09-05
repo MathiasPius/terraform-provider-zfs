@@ -37,7 +37,7 @@ func resourceVolume() *schema.Resource {
 				Required:    true,
 			},
 			"sparse": {
-				Description: "If the volume is sparsely provisioned",
+				Description: "If the volume is sparsely provisioned. Defaults to `false`",
 				Type:        schema.TypeBool,
 				Optional:    true,
 				Default:     false,
