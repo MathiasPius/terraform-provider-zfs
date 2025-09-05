@@ -104,6 +104,7 @@ func resourceFilesystemCreate(ctx context.Context, d *schema.ResourceData, meta 
 	mountpoint := d.Get("mountpoint").(string)
 	properties := parsePropertyBlocks(d.Get("property").(*schema.Set).List())
 	filesystem, err = createDataset(config, &CreateDataset{
+		dsType:     FilesystemType,
 		name:       filesystemName,
 		mountpoint: mountpoint,
 		properties: properties,

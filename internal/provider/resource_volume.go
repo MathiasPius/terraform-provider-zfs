@@ -36,6 +36,12 @@ func resourceVolume() *schema.Resource {
 				Optional:    false,
 				Required:    true,
 			},
+			"sparse": {
+				Description: "If the volume is sparsely provisioned",
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Default:     false,
+			},
 			"property":       &propertySchema,
 			"property_mode":  &propertyModeSchema,
 			"properties":     &propertiesSchema,
@@ -74,10 +80,13 @@ func resourceVolumeCreate(ctx context.Context, d *schema.ResourceData, meta inte
 	}
 
 	volsize := d.Get("volsize").(string)
+	sparse := d.Get("sparse").(bool)
 	properties := parsePropertyBlocks(d.Get("property").(*schema.Set).List())
 	volume, err = createDataset(config, &CreateDataset{
+		dsType:     VolumeType,
 		name:       volumeName,
 		volsize:    volsize,
+		sparse:     sparse,
 		properties: properties,
 	})
 
