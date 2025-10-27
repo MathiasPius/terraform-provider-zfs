@@ -43,11 +43,6 @@ func resourceVolume() *schema.Resource {
 				Optional:    true,
 				Default:     false,
 			},
-			"tail": {
-				Description: "Last segment of name",
-				Type:        schema.TypeString,
-				Computed:    true,
-			},
 			"property":       &propertySchema,
 			"property_mode":  &propertyModeSchema,
 			"properties":     &propertiesSchema,
@@ -134,11 +129,6 @@ func resourceVolumeRead(ctx context.Context, d *schema.ResourceData, meta interf
 	}
 
 	if err = d.Set("volsize", volume.volsize); err != nil {
-		return diag.FromErr(err)
-	}
-
-	tail := path.Base(volumeName)
-	if err = d.Set("tail", tail); err != nil {
 		return diag.FromErr(err)
 	}
 
