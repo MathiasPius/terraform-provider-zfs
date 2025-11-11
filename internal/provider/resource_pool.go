@@ -62,7 +62,7 @@ var propertyModeSchema = schema.Schema{
 
 		"native" means manage all native zfs properties, but leave user properties alone (see man zfsprops for more info
 		about these types of properties). This means all properties that aren't defined in the terraform resource but that
-		are explicitly overriden on the zfs resource will be set back to inherit from their parent/the default.
+		are explicitly overridden on the zfs resource will be set back to inherit from their parent/the default.
 
 		"all" is like "native", but also includes user properties. Be careful when removing/altering properties you don't
 		recognize as some tools might use user properties to track information important for that tool to work properly
@@ -167,11 +167,7 @@ func resourcePoolCreate(ctx context.Context, d *schema.ResourceData, meta interf
 		}
 	}
 
-	vdev_spec, err := parseVdevSpecification(d.Get("mirror"), d.Get("device"))
-	if err != nil {
-		log.Printf("[DEBUG] failed to parse vdev specification")
-		return diag.FromErr(err)
-	}
+	vdev_spec := parseVdevSpecification(d.Get("mirror"), d.Get("device"))
 
 	properties := parsePropertyBlocks(d.Get("property").(*schema.Set).List())
 

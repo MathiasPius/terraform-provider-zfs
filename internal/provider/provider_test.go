@@ -12,6 +12,7 @@ import (
 // to create a provider server to which the CLI can reattach.
 //
 //lint:ignore U1000 this is used during acceptance testing. It's not unused.
+//nolint:unparam
 var providerFactories = map[string]func() (*schema.Provider, error){
 	"zfs": func() (*schema.Provider, error) {
 		return New("dev")(), nil

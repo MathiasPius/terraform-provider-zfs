@@ -5,7 +5,8 @@ linters:
     - copyloopvar
     - durationcheck
     - errcheck
-    - forcetypeassert
+    # If you want to use a typed language, don't use Go.
+    # - forcetypeassert
     - godot
     - ineffassign
     - makezero
