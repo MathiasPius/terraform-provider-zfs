@@ -8,22 +8,22 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
-func dataSourceDataset() *schema.Resource {
+func dataSourceFilesystem() *schema.Resource {
 	return &schema.Resource{
 		// This description is used by the documentation generator and the language server.
-		Description: "Data about a specific dataset.",
+		Description: "Data about a specific filesystem.",
 
-		ReadContext: dataSourceDatasetRead,
+		ReadContext: dataSourceFilesystemRead,
 
 		Schema: map[string]*schema.Schema{
 			"name": {
 				// This description is used by the documentation generator and the language server.
-				Description: "Name of the zfs dataset.",
+				Description: "Name of the zfs filesystem.",
 				Type:        schema.TypeString,
 				Required:    true,
 			},
 			"mountpoint": {
-				Description: "Mountpoint of the dataset.",
+				Description: "Mountpoint of the filesystem.",
 				Type:        schema.TypeString,
 				Computed:    true,
 			},
@@ -53,16 +53,16 @@ func dataSourceDataset() *schema.Resource {
 	}
 }
 
-func dataSourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+func dataSourceFilesystemRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	var diags diag.Diagnostics
 
 	config := meta.(*Config)
 
-	datasetName := d.Get("name").(string)
-	dataset, err := describeDataset(config, datasetName, getPropertyNames(d))
+	filesystemName := d.Get("name").(string)
+	filesystem, err := describeDataset(config, filesystemName, getPropertyNames(d))
 
-	if dataset == nil {
-		log.Println("[DEBUG] zfs dataset does not exist!")
+	if filesystem == nil {
+		log.Println("[DEBUG] zfs filesystem does not exist!")
 	}
 
 	if err != nil {
@@ -82,10 +82,10 @@ func dataSourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta int
 		}
 	}
 
-	d.SetId(dataset.guid)
+	d.SetId(filesystem.guid)
 
-	if dataset.mountpoint != "" && dataset.mountpoint != "none" && dataset.mountpoint != "legacy" {
-		owner, err := getFileOwnership(config, dataset.mountpoint)
+	if filesystem.mountpoint != "" && filesystem.mountpoint != "none" && filesystem.mountpoint != "legacy" {
+		owner, err := getFileOwnership(config, filesystem.mountpoint)
 		if err != nil {
 			return diag.FromErr(err)
 		}
@@ -106,12 +106,12 @@ func dataSourceDatasetRead(ctx context.Context, d *schema.ResourceData, meta int
 			return diag.FromErr(err)
 		}
 
-		if err = d.Set("mountpoint", dataset.mountpoint); err != nil {
+		if err = d.Set("mountpoint", filesystem.mountpoint); err != nil {
 			return diag.FromErr(err)
 		}
 	}
 
-	if err = updateCalculatedPropertiesInState(d, dataset.properties); err != nil {
+	if err = updateCalculatedPropertiesInState(d, filesystem.properties); err != nil {
 		return diag.FromErr(err)
 	}
 
