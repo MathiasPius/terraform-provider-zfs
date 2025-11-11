@@ -47,7 +47,7 @@ func parsePropertySource(input string) (PropertySource, error) {
 	case "-":
 		return SourceNone, nil
 	default:
-		return "", fmt.Errorf("Unrecognized source %s", input)
+		return "", fmt.Errorf("unrecognized source %s", input)
 	}
 }
 
@@ -88,10 +88,7 @@ func isPoolProperty(property string) bool {
 			return true
 		}
 	}
-	if strings.HasPrefix(property, "feature@") {
-		return true
-	}
-	return false
+	return strings.HasPrefix(property, "feature@")
 }
 
 type Property struct {
@@ -235,7 +232,7 @@ func updatePropertiesInState(d *schema.ResourceData, properties map[string]Prope
 				}
 				fallthrough // native is just all with a filter for user properties, so fallthrough now that the filter has been applied.
 			case "all":
-				if !(property.source == SourceLocal || property.source == SourceTemporary) {
+				if property.source != SourceLocal && property.source != SourceTemporary {
 					// Ignore properties that aren't in some way overridden on the resource.
 					continue
 				}
@@ -246,7 +243,7 @@ func updatePropertiesInState(d *schema.ResourceData, properties map[string]Prope
 					continue
 				}
 			default:
-				return fmt.Errorf("Invalid value %s for property_mode", mode)
+				return fmt.Errorf("invalid value %s for property_mode", mode)
 			}
 		}
 		block := make(map[string]interface{}, 0)
@@ -285,7 +282,7 @@ func applyPropertyDiff(
 	for name, value := range overrideProperties {
 		for _, property := range newProperties.List() {
 			if property.(map[string]interface{})["name"] == name {
-				return fmt.Errorf("Don't set '%s' as a property block, use the dedicated attribute instead.", name)
+				return fmt.Errorf("don't set '%s' as a property block, use the dedicated attribute instead", name)
 			}
 		}
 		property := make(map[string]interface{})
@@ -459,7 +456,7 @@ func readPoolLayout(config *Config, poolName string) (*PoolLayout, error) {
 		// All vdevs prefixed with "mirror" indicate the start of a mirrored vdev definition.
 		// mirror* is also a reserved name so we know that if it starts with mirror, it is a mirror.
 		// This is further ensured because we use the -P flag (use full path) with the zpool list
-		// command, meaning all devide vdevs should start with a a forward slash.
+		// command, meaning all divide vdevs should start with a a forward slash.
 		if strings.HasPrefix(line[1], "mirror") {
 			layout.mirrors = append(layout.mirrors, Mirror{
 				devices: make([]Device, 0),

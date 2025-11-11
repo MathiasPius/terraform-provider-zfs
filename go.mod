@@ -1,6 +1,6 @@
 module github.com/MathiasPius/terraform-provider-zfs
 
-go 1.18
+go 1.24.0
 
 require (
 	github.com/alessio/shellescape v1.4.1
