@@ -71,7 +71,7 @@ func getFileOwnership(config *Config, path string) (*Ownership, error) {
 	}, nil
 }
 
-func parseVdevSpecification(mirrors interface{}, devices interface{}) (string, error) {
+func parseVdevSpecification(mirrors interface{}, devices interface{}) string {
 	vdevs := ""
 	if mirrors != nil {
 		for _, mirror := range mirrors.([]interface{}) {
@@ -92,7 +92,7 @@ func parseVdevSpecification(mirrors interface{}, devices interface{}) (string, e
 	}
 
 	log.Printf("[DEBUG] vdev specification: %s", vdevs)
-	return vdevs, nil
+	return vdevs
 }
 
 func parsePropertyBlocks(options []interface{}) map[string]string {
@@ -108,7 +108,7 @@ func parsePropertyBlocks(options []interface{}) map[string]string {
 
 func mapKeys[T interface{}](value map[string]T) []string {
 	keys := make([]string, 0)
-	for key, _ := range value {
+	for key := range value {
 		keys = append(keys, key)
 	}
 	return keys
@@ -116,6 +116,7 @@ func mapKeys[T interface{}](value map[string]T) []string {
 
 func getPropertyNames(d *schema.ResourceData) []string {
 	names := make([]string, 0)
+
 	for _, property := range d.Get("property").(*schema.Set).List() {
 		names = append(names, property.(map[string]interface{})["name"].(string))
 	}
