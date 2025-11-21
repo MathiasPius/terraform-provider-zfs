@@ -25,10 +25,8 @@ const (
 type DatasetType string
 
 const (
-	//BookmarkType DatasetType = "bookmark"
 	FilesystemType DatasetType = "filesystem"
-	//SnapshotType DatasetType = "snapshot"
-	VolumeType DatasetType = "volume"
+	VolumeType     DatasetType = "volume"
 )
 
 func parsePropertySource(input string) (PropertySource, error) {
@@ -393,7 +391,7 @@ func describeDataset(config *Config, datasetName string, requiredProperties []st
 	case "volume":
 		dataset.dsType = VolumeType
 	default:
-		return nil, fmt.Errorf("Unsupported zfs dataset type %s with guid %s", properties["type"].value, properties["guid"].value)
+		return nil, fmt.Errorf("unsupported zfs dataset type %s with guid %s", properties["type"].value, properties["guid"].value)
 	}
 
 	return &dataset, nil
@@ -515,11 +513,12 @@ func createDataset(config *Config, dataset *CreateDataset) (*Dataset, error) {
 	properties := dataset.properties
 	serialized_options := ""
 
-	if dataset.dsType == FilesystemType {
+	switch dataset.dsType {
+	case FilesystemType:
 		if dataset.mountpoint != "" {
 			properties["mountpoint"] = dataset.mountpoint
 		}
-	} else if dataset.dsType == VolumeType {
+	case VolumeType:
 		if dataset.sparse {
 			serialized_options += " -s"
 		}
