@@ -22,6 +22,15 @@ const (
 	SourceNone      PropertySource = "none"
 )
 
+type DatasetType string
+
+const (
+	//BookmarkType DatasetType = "bookmark"
+	FilesystemType DatasetType = "filesystem"
+	//SnapshotType DatasetType = "snapshot"
+	VolumeType DatasetType = "volume"
+)
+
 func parsePropertySource(input string) (PropertySource, error) {
 	// Inherited is actually represented as "inherited from ...", so we only look at the first word.
 	switch parts := strings.SplitN(input, " ", 2); parts[0] {
@@ -315,6 +324,7 @@ func applyPropertyDiff(
 }
 
 type Dataset struct {
+	dsType     DatasetType
 	guid       string
 	creation   string
 	used       string
@@ -322,6 +332,7 @@ type Dataset struct {
 	referenced string
 	mounted    string
 	mountpoint string
+	volsize    string
 	properties map[string]Property
 }
 
@@ -373,7 +384,17 @@ func describeDataset(config *Config, datasetName string, requiredProperties []st
 	dataset.referenced = properties["referenced"].value
 	dataset.mounted = properties["mounted"].value
 	dataset.mountpoint = properties["mountpoint"].value
+	dataset.volsize = properties["volsize"].rawValue
 	dataset.guid = properties["guid"].value
+
+	switch properties["type"].value {
+	case "filesystem":
+		dataset.dsType = FilesystemType
+	case "volume":
+		dataset.dsType = VolumeType
+	default:
+		return nil, fmt.Errorf("Unsupported zfs dataset type %s with guid %s", properties["type"].value, properties["guid"].value)
+	}
 
 	return &dataset, nil
 }
@@ -482,19 +503,29 @@ func describePool(config *Config, poolName string, requiredProperties []string) 
 }
 
 type CreateDataset struct {
+	dsType     DatasetType
 	name       string
 	mountpoint string
+	volsize    string
+	sparse     bool
 	properties map[string]string
 }
 
 func createDataset(config *Config, dataset *CreateDataset) (*Dataset, error) {
 	properties := dataset.properties
+	serialized_options := ""
 
-	if dataset.mountpoint != "" {
-		properties["mountpoint"] = dataset.mountpoint
+	if dataset.dsType == FilesystemType {
+		if dataset.mountpoint != "" {
+			properties["mountpoint"] = dataset.mountpoint
+		}
+	} else if dataset.dsType == VolumeType {
+		if dataset.sparse {
+			serialized_options += " -s"
+		}
+		serialized_options += fmt.Sprintf(" -V %s", dataset.volsize)
 	}
 
-	serialized_options := ""
 	for property, value := range properties {
 		serialized_options += fmt.Sprintf(" -o %s=%s", shellescape.Quote(property), shellescape.Quote(value))
 	}
