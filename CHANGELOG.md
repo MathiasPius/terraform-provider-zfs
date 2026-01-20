@@ -1,3 +1,7 @@
+
+## 0.6.1
+* @kemoycampbell fixed pool imports.
+
 ## 0.6.0
 
 ### Breaking
