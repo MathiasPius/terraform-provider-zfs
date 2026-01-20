@@ -164,7 +164,7 @@ func readAllProperties(config *Config, baseCommand string, resourceName string, 
 		}
 	}
 	if len(missing) > 0 {
-		if err := readSomeProperties(config, baseCommand, resourceName, strings.Join(requiredProperties, ","), properties); err != nil {
+		if err := readSomeProperties(config, baseCommand, resourceName, strings.Join(missing, ","), properties); err != nil {
 			return err
 		}
 	}
@@ -212,6 +212,14 @@ func updatePropertiesInState(d *schema.ResourceData, properties map[string]Prope
 	ignored := make(map[string]bool)
 	for _, name := range ignoredProperties {
 		ignored[name] = true
+	}
+
+	//make mode defined if not set. This is useful for the import case.
+	//without this the import failed with invalid value "" for property_mode
+	if _, ok := d.GetOk("property_mode"); !ok {
+		if err := d.Set("property_mode", "defined"); err != nil {
+			return err
+		}
 	}
 
 	mode := d.Get("property_mode").(string)
