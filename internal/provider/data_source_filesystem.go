@@ -59,7 +59,7 @@ func dataSourceFilesystemRead(ctx context.Context, d *schema.ResourceData, meta 
 	config := meta.(*Config)
 
 	filesystemName := d.Get("name").(string)
-	filesystem, err := describeDataset(config, filesystemName, getPropertyNames(d))
+	filesystem, err := describeDataset(config, filesystemName, []string{})
 
 	if filesystem == nil {
 		log.Println("[DEBUG] zfs filesystem does not exist!")
