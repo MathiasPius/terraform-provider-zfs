@@ -39,7 +39,7 @@ func dataSourceVolumeRead(ctx context.Context, d *schema.ResourceData, meta inte
 	config := meta.(*Config)
 
 	volumeName := d.Get("name").(string)
-	volume, err := describeDataset(config, volumeName, getPropertyNames(d))
+	volume, err := describeDataset(config, volumeName, []string{})
 
 	if volume == nil {
 		log.Println("[DEBUG] zfs volume does not exist!")
