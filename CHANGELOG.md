@@ -1,4 +1,7 @@
 
+## 0.6.2
+* @jaynis fixed zfs filesystem/dataset `data` sources attempting to retrieve "required" properties, when no such properties are listed for datasources.
+
 ## 0.6.1
 * @kemoycampbell fixed pool imports.
 
