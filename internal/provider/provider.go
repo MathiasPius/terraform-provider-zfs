@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
@@ -70,6 +71,12 @@ func New(version string) func() *schema.Provider {
 					Optional:    true,
 					DefaultFunc: schema.EnvDefaultFunc("ZFS_PROVIDER_PASSWORD", nil),
 				},
+				"agent_socket": {
+					Description: "Path to the SSH agent socket used for authentication. Overrides the `SSH_AUTH_SOCK` environment variable for this provider, so one agent can be chosen per configuration.",
+					Type:        schema.TypeString,
+					Optional:    true,
+					DefaultFunc: schema.EnvDefaultFunc("ZFS_PROVIDER_AGENT_SOCKET", nil),
+				},
 				"command_prefix": {
 					Description: "Can be used to prefix all ssh commands issued on the target host. For example, a command_prefix of 'sudo' can be used to elevate privileges on the target host, assuming password-less is configured for the user",
 					Type:        schema.TypeString,
@@ -97,6 +104,13 @@ func New(version string) func() *schema.Provider {
 
 func configure(version string, p *schema.Provider) func(context.Context, *schema.ResourceData) (interface{}, diag.Diagnostics) {
 	return func(ctx context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
+		// easyssh-proxy reads the agent socket from SSH_AUTH_SOCK on every
+		// connection. Setting it here affects only this provider's process.
+		if socket := d.Get("agent_socket").(string); socket != "" {
+			if err := os.Setenv("SSH_AUTH_SOCK", socket); err != nil {
+				return nil, diag.FromErr(err)
+			}
+		}
 		return &Config{
 			command_prefix: d.Get("command_prefix").(string),
 			ssh: &easyssh.MakeConfig{
