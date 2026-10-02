@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
@@ -76,6 +77,12 @@ func New(version string) func() *schema.Provider {
 					Optional:    true,
 					DefaultFunc: schema.EnvDefaultFunc("ZFS_PROVIDER_COMMAND_PREFIX", nil),
 				},
+				"agent_socket": {
+					Description: "Path to the ssh agent socket to use for authentication. Overrides the SSH_AUTH_SOCK environment variable, which is used by default",
+					Type:        schema.TypeString,
+					Optional:    true,
+					DefaultFunc: schema.EnvDefaultFunc("ZFS_PROVIDER_AGENT_SOCKET", nil),
+				},
 			},
 			DataSourcesMap: map[string]*schema.Resource{
 				"zfs_pool":       dataSourcePool(),
@@ -97,6 +104,13 @@ func New(version string) func() *schema.Provider {
 
 func configure(version string, p *schema.Provider) func(context.Context, *schema.ResourceData) (interface{}, diag.Diagnostics) {
 	return func(ctx context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
+		// easyssh only reads the agent from SSH_AUTH_SOCK, so override it if a socket was specified
+		if socket := d.Get("agent_socket").(string); socket != "" {
+			if err := os.Setenv("SSH_AUTH_SOCK", socket); err != nil {
+				return nil, diag.FromErr(err)
+			}
+		}
+
 		return &Config{
 			command_prefix: d.Get("command_prefix").(string),
 			ssh: &easyssh.MakeConfig{
